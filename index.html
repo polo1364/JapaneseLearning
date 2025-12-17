@@ -1,0 +1,3049 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinguaMax - AI 日語學習系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #58cc02;
+            --primary-dark: #46a302;
+            --secondary: #1cb0f6;
+            --gold: #ffc800;
+            --danger: #ff4b4b;
+            --bg-dark: #131f24;
+            --bg-card: #1a2c35;
+            --text-light: #afafaf;
+        }
+
+        * { font-family: 'Nunito', sans-serif; }
+        
+        body {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #0f1a1f 100%);
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: rgba(26, 44, 53, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .glow-green { box-shadow: 0 0 20px rgba(88, 204, 2, 0.3); }
+        .glow-blue { box-shadow: 0 0 20px rgba(28, 176, 246, 0.3); }
+        .glow-gold { box-shadow: 0 0 20px rgba(255, 200, 0, 0.3); }
+
+        /* Flashcard 3D 翻轉 */
+        .flashcard { perspective: 1500px; }
+        .flashcard-inner {
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+        .flashcard-face {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .flashcard-back { transform: rotateY(180deg); }
+
+        /* 進度條動畫 */
+        .progress-fill {
+            transition: width 0.5s ease-out;
+            background: linear-gradient(90deg, var(--primary), #7cd836);
+        }
+
+        /* 按鈕效果 */
+        .btn-primary {
+            background: var(--primary);
+            box-shadow: 0 4px 0 var(--primary-dark);
+            transition: all 0.1s;
+        }
+        .btn-primary:active {
+            box-shadow: 0 2px 0 var(--primary-dark);
+            transform: translateY(2px);
+        }
+
+        .btn-option {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.2);
+            transition: all 0.2s;
+        }
+        .btn-option:hover {
+            border-color: var(--secondary);
+            background: rgba(28, 176, 246, 0.1);
+        }
+        .btn-option.correct {
+            border-color: var(--primary) !important;
+            background: rgba(88, 204, 2, 0.2) !important;
+            animation: pulse-green 0.5s;
+        }
+        .btn-option.wrong {
+            border-color: var(--danger) !important;
+            background: rgba(255, 75, 75, 0.2) !important;
+            animation: shake 0.5s;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .animate-slide { animation: slideIn 0.5s ease-out; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+
+        /* 統計卡片 */
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* XP 動畫 */
+        .xp-popup {
+            animation: xpFloat 1.5s ease-out forwards;
+        }
+        @keyframes xpFloat {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.2); }
+        }
+
+        /* 連續天數火焰 */
+        .streak-fire {
+            animation: fireGlow 1.5s ease-in-out infinite alternate;
+        }
+        @keyframes fireGlow {
+            from { filter: drop-shadow(0 0 5px #ff6b00); }
+            to { filter: drop-shadow(0 0 15px #ff9500); }
+        }
+
+        /* 聽力波形 */
+        .sound-wave {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            height: 30px;
+        }
+        .sound-wave span {
+            width: 4px;
+            background: var(--secondary);
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+        .sound-wave span:nth-child(1) { animation-delay: 0s; height: 40%; }
+        .sound-wave span:nth-child(2) { animation-delay: 0.1s; height: 70%; }
+        .sound-wave span:nth-child(3) { animation-delay: 0.2s; height: 100%; }
+        .sound-wave span:nth-child(4) { animation-delay: 0.3s; height: 70%; }
+        .sound-wave span:nth-child(5) { animation-delay: 0.4s; height: 40%; }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.5); }
+        }
+
+        /* 打字輸入 */
+        .typing-input {
+            background: transparent;
+            border-bottom: 3px solid var(--secondary);
+            color: white;
+            font-size: 1.5rem;
+            text-align: center;
+            outline: none;
+            caret-color: var(--secondary);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            backdrop-filter: blur(8px);
+            background: rgba(0,0,0,0.7);
+        }
+
+        /* 隱藏 scrollbar 但可滾動 */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 下拉選單修復 - 確保文字可見 */
+        select {
+            color: white !important;
+            background-color: rgba(30, 41, 59, 0.95) !important;
+        }
+        select option {
+            background-color: #1e293b !important;
+            color: white !important;
+            padding: 12px !important;
+        }
+        select:focus {
+            outline: 2px solid var(--primary);
+        }
+
+        /* 初學者友善 - 更大的字體和間距 */
+        .beginner-friendly {
+            font-size: 1.1rem;
+            line-height: 1.8;
+        }
+
+        /* 提示標籤 */
+        .hint-tag {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #1e293b;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* 新手引導氣泡 */
+        .guide-bubble {
+            position: relative;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+        .guide-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 20px;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid #8b5cf6;
+        }
+    </style>
+</head>
+<body class="text-white overflow-hidden">
+
+    <!-- API Key Modal -->
+    <div id="key-modal" class="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4">
+        <div class="glass-card rounded-3xl p-8 w-full max-w-md animate-slide">
+            <div class="text-center mb-6">
+                <div class="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-float">
+                    <i class="fa-solid fa-robot text-4xl"></i>
+                </div>
+                <h2 class="text-2xl font-black">歡迎來到 LinguaMax</h2>
+                <p class="text-gray-400 mt-2">輸入 Gemini API Key 開始學習</p>
+            </div>
+            <input type="password" id="api-key-input" 
+                class="w-full bg-white/10 border border-white/20 rounded-xl p-4 mb-4 text-white placeholder-gray-500 focus:border-green-500 focus:outline-none transition"
+                placeholder="AIzaSy...">
+            <button onclick="saveApiKey()" class="btn-primary w-full py-4 rounded-xl text-lg font-bold text-white">
+                開始學習 <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 主畫面 -->
+    <div class="h-screen flex flex-col">
+        <!-- 頂部導航 -->
+        <header class="glass-card border-b border-white/10 px-4 py-3">
+            <div class="max-w-6xl mx-auto flex items-center justify-between">
+                <div class="flex items-center gap-3 md:gap-6">
+                    <!-- 手機版選單按鈕 -->
+                    <button onclick="toggleMobileMenu()" class="lg:hidden w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                        <i class="fa-solid fa-bars text-lg"></i>
+            </button>
+
+                    <h1 class="text-lg md:text-xl font-black bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
+                        LinguaMax
+                    </h1>
+                    
+                    <!-- 連續天數 -->
+                    <div class="hidden sm:flex items-center gap-2 bg-orange-500/20 px-3 py-1 rounded-full">
+                        <i class="fa-solid fa-fire streak-fire text-orange-500"></i>
+                        <span id="streak-count" class="font-bold text-orange-400">0</span>
+        </div>
+
+                    <!-- XP -->
+                    <div class="flex items-center gap-2 bg-yellow-500/20 px-3 py-1 rounded-full">
+                        <i class="fa-solid fa-star text-yellow-500"></i>
+                        <span id="xp-count" class="font-bold text-yellow-400">0 XP</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <!-- 等級選擇 -->
+                    <div class="relative">
+                        <label class="text-xs text-gray-400 absolute -top-5 left-0">難度等級</label>
+                        <select id="level-select" onchange="onLevelChange()" class="bg-slate-800 border-2 border-slate-600 rounded-xl px-4 py-2.5 text-base font-semibold cursor-pointer hover:border-green-500 transition min-w-[200px]">
+                            <option value="N5" selected>🌱 入門 (N5)</option>
+                            <option value="N4">🌿 初級 (N4)</option>
+                            <option value="N3">🌳 中級 (N3)</option>
+                            <option value="N2">🌲 中高級 (N2)</option>
+                            <option value="N1">🏔️ 進階 (N1)</option>
+                            <option value="SURVIVAL">🧭 旅日生存</option>
+                            <option value="TRAVEL_PLUS">✈️ 旅遊進階</option>
+                            <option value="BIZ_KEIGO">💼 職場敬語</option>
+                            <option value="CASUAL">🗣️ 日常俗語</option>
+                            <option value="IT_DEV">👩‍💻 IT / 工程</option>
+                            <option value="KANA_HIRA">🈁 平假名入門</option>
+                            <option value="KANA_KATA">🈂️ 片假名入門</option>
+                            <option value="CONVO">💬 會話優先</option>
+                    </select>
+                    </div>
+
+                    <!-- 個人資料 -->
+                    <button onclick="openStats()" class="w-11 h-11 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center font-bold hover:scale-105 transition" title="學習統計">
+                        <i class="fa-solid fa-chart-line text-lg"></i>
+                </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 手機版選單 (覆蓋層) -->
+        <div id="mobile-menu" class="fixed inset-0 z-40 hidden lg:hidden">
+            <div class="absolute inset-0 bg-black/60" onclick="toggleMobileMenu()"></div>
+            <aside class="absolute left-0 top-0 bottom-0 w-72 glass-card border-r border-white/10 p-4 overflow-y-auto hide-scrollbar animate-slide">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-gray-400 flex items-center gap-2">
+                        <i class="fa-solid fa-book-open text-green-500"></i> 選擇學習模式
+                    </h3>
+                    <button onclick="toggleMobileMenu()" class="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+            </div>
+
+                <nav class="space-y-2" id="mobile-mode-nav">
+                    <button onclick="switchMode('kana'); toggleMobileMenu();" data-mode="kana" 
+                        class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-language text-xl text-emerald-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">五十音</div>
+                            <div class="text-xs opacity-60">平假名 / 片假名</div>
+                        </div>
+                    </button>
+                    <button onclick="switchMode('flashcard'); toggleMobileMenu();" data-mode="flashcard" 
+                        class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/20 border-2 border-green-500 text-green-400">
+                        <i class="fa-solid fa-clone text-xl"></i>
+                        <div class="text-left">
+                            <div class="font-bold">單字閃卡</div>
+                            <div class="text-xs opacity-60">翻轉學習新單字</div>
+            </div>
+                    </button>
+                    <button onclick="switchMode('quiz'); toggleMobileMenu();" data-mode="quiz" 
+                        class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-circle-question text-xl text-blue-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">選擇題測驗</div>
+                            <div class="text-xs opacity-60">四選一快速練習</div>
+                        </div>
+                    </button>
+                    <button onclick="switchMode('typing'); toggleMobileMenu();" data-mode="typing" 
+                        class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-keyboard text-xl text-purple-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">拼寫練習</div>
+                            <div class="text-xs opacity-60">打字記憶單字</div>
+                        </div>
+                    </button>
+                    <button onclick="switchMode('listening'); toggleMobileMenu();" data-mode="listening" 
+                        class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-headphones text-xl text-cyan-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">聽力訓練</div>
+                            <div class="text-xs opacity-60">聽音辨義練習</div>
+                        </div>
+                    </button>
+                    <button onclick="switchMode('grammar'); toggleMobileMenu();" data-mode="grammar" 
+                        class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-spell-check text-xl text-amber-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">文法闘關</div>
+                            <div class="text-xs opacity-60">句型結構練習</div>
+                        </div>
+                    </button>
+                    <button onclick="switchMode('chat'); toggleMobileMenu();" data-mode="chat" 
+                        class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-comments text-xl text-rose-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">AI 對話</div>
+                            <div class="text-xs opacity-60">情境日語會話</div>
+                        </div>
+                    </button>
+                </nav>
+
+                <hr class="border-white/10 my-6">
+
+                <h3 class="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-folder text-yellow-500"></i> 選擇學習主題
+                </h3>
+                <select id="mobile-topic-select" onchange="onMobileTopicChange()" 
+                    class="w-full bg-slate-800 border-2 border-slate-600 rounded-xl px-4 py-3 text-base font-semibold cursor-pointer hover:border-yellow-500 transition">
+                    <!-- 動態生成 -->
+                </select>
+            </aside>
+            </div>
+
+        <!-- 主內容區 -->
+        <div class="flex-1 flex overflow-hidden">
+            <!-- 側邊欄 (桌面版) -->
+            <aside class="w-72 glass-card border-r border-white/10 p-4 hidden lg:block overflow-y-auto hide-scrollbar">
+                <h3 class="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-green-500"></i> 選擇學習模式
+                </h3>
+                
+                <nav class="space-y-2" id="mode-nav">
+                    <button onclick="switchMode('kana')" data-mode="kana" 
+                        class="mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-language text-xl text-emerald-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">五十音</div>
+                            <div class="text-xs opacity-60">平假名 / 片假名專區</div>
+                        </div>
+                    </button>
+
+                    <button onclick="switchMode('flashcard')" data-mode="flashcard" 
+                        class="mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/20 border-2 border-green-500 text-green-400">
+                        <i class="fa-solid fa-clone text-xl"></i>
+                        <div class="text-left">
+                            <div class="font-bold">單字閃卡</div>
+                            <div class="text-xs opacity-60">翻轉學習新單字</div>
+                        </div>
+                    </button>
+
+                    <button onclick="switchMode('quiz')" data-mode="quiz" 
+                        class="mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-circle-question text-xl text-blue-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">選擇題測驗</div>
+                            <div class="text-xs opacity-60">四選一快速練習</div>
+                        </div>
+                    </button>
+
+                    <button onclick="switchMode('typing')" data-mode="typing" 
+                        class="mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-keyboard text-xl text-purple-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">拼寫練習</div>
+                            <div class="text-xs opacity-60">打字記憶單字</div>
+                        </div>
+                    </button>
+
+                    <button onclick="switchMode('listening')" data-mode="listening" 
+                        class="mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-headphones text-xl text-cyan-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">聽力訓練</div>
+                            <div class="text-xs opacity-60">聽音辨義練習</div>
+                        </div>
+                    </button>
+
+                    <button onclick="switchMode('grammar')" data-mode="grammar" 
+                        class="mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-spell-check text-xl text-amber-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">文法闖關</div>
+                            <div class="text-xs opacity-60">句型結構練習</div>
+                        </div>
+                    </button>
+
+                    <button onclick="switchMode('chat')" data-mode="chat" 
+                        class="mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 border-2 border-transparent">
+                        <i class="fa-solid fa-comments text-xl text-rose-400"></i>
+                        <div class="text-left">
+                            <div class="font-bold">AI 對話</div>
+                            <div class="text-xs opacity-60">情境日語會話</div>
+                        </div>
+                    </button>
+                </nav>
+
+                <hr class="border-white/10 my-6">
+
+                <h3 class="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-folder text-yellow-500"></i> 選擇學習主題
+                </h3>
+                <select id="topic-select" onchange="onTopicChange()" 
+                    class="w-full bg-slate-800 border-2 border-slate-600 rounded-xl px-4 py-3 text-base font-semibold cursor-pointer hover:border-yellow-500 transition">
+                    <!-- 動態生成 -->
+                </select>
+                <div id="topic-list" class="hidden">
+                    <!-- 保留給舊版相容 -->
+                </div>
+
+                <hr class="border-white/10 my-6">
+
+                <!-- 今日進度 -->
+                <div class="glass-card rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-bold">今日目標</span>
+                        <span class="text-xs text-gray-400"><span id="today-learned">0</span>/20 單字</span>
+                    </div>
+                    <div class="h-3 bg-white/10 rounded-full overflow-hidden">
+                        <div id="daily-progress" class="progress-fill h-full rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- 等級進度 -->
+                <div class="glass-card rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-bold flex items-center gap-2">
+                            <span id="user-level-badge" class="text-lg">🌱</span>
+                            Lv.<span id="user-level">1</span>
+                        </span>
+                        <span class="text-xs text-gray-400"><span id="xp-to-next">0</span>/<span id="xp-needed">100</span> XP</span>
+                    </div>
+                    <div class="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div id="level-progress" class="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- 快捷鍵提示 -->
+                <div class="text-xs text-gray-500 space-y-1">
+                    <p class="font-bold text-gray-400 mb-2"><i class="fa-solid fa-keyboard mr-1"></i>快捷鍵</p>
+                    <p><kbd class="bg-white/10 px-1.5 py-0.5 rounded">空白</kbd> 翻轉/播放</p>
+                    <p><kbd class="bg-white/10 px-1.5 py-0.5 rounded">1-4</kbd> 選擇答案</p>
+                    <p><kbd class="bg-white/10 px-1.5 py-0.5 rounded">S</kbd> 慢速 <kbd class="bg-white/10 px-1.5 py-0.5 rounded">R</kbd> 重複</p>
+                </div>
+            </aside>
+
+            <!-- 主學習區 -->
+            <main class="flex-1 overflow-y-auto hide-scrollbar p-6">
+                <div class="max-w-3xl mx-auto">
+                    
+                    <!-- 載入中 -->
+                    <div id="loading" class="hidden fixed inset-0 bg-black/50 z-40 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                            <p class="mt-4 font-bold text-lg">AI 正在生成學習內容...</p>
+                        </div>
+                    </div>
+
+                    <!-- 學習進度條 -->
+                    <div id="session-progress" class="mb-6 hidden">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm text-gray-400">學習進度</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-bold"><span id="current-idx">1</span> / <span id="total-items">5</span></span>
+                                <button onclick="regenerateContent()" 
+                                    class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full flex items-center gap-1 transition"
+                                    title="換一批新單字">
+                                    <i class="fa-solid fa-shuffle"></i> 換一批
+                                </button>
+                            </div>
+                        </div>
+                        <div class="h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div id="session-bar" class="progress-fill h-full rounded-full" style="width: 20%"></div>
+                        </div>
+                    </div>
+
+                    <!-- 五十音模式 -->
+                    <div id="view-kana" class="view-section hidden">
+                        <div class="glass-card rounded-3xl p-6 md:p-8 animate-slide">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                                <div>
+                                    <div class="inline-flex items-center px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold mb-2">
+                                        <i class="fa-solid fa-language mr-2"></i> 五十音專區
+                                    </div>
+                                    <h2 class="text-2xl md:text-3xl font-black">平假名 / 片假名練習</h2>
+                                    <p class="text-sm text-gray-300 mt-1">固定字卡，包含發音、假名與例字，先熟練讀音再進入單字。</p>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap gap-3 mb-4">
+                                <button onclick="switchKanaMode('hiragana')" class="px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-100 font-bold hover:bg-emerald-500/30 transition">
+                                    🈁 平假名
+                                </button>
+                                <button onclick="switchKanaMode('katakana')" class="px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-100 font-bold hover:bg-cyan-500/30 transition">
+                                    🈂️ 片假名
+                                </button>
+                            </div>
+
+                            <div id="kana-grid" class="grid grid-cols-5 gap-3 md:gap-4 mt-4"></div>
+                            <div id="kana-extra" class="space-y-6 mt-6"></div>
+                        </div>
+                    </div>
+
+                    <!-- 閃卡模式 -->
+                    <div id="view-flashcard" class="view-section">
+                        <!-- 新手提示 -->
+                        <div id="flashcard-guide" class="guide-bubble mb-6 text-center max-w-md mx-auto">
+                            <i class="fa-solid fa-hand-pointer mr-2"></i>
+                            <strong>提示：</strong>點擊卡片可以翻轉查看中文意思！
+                            <button onclick="this.parentElement.style.display='none'" class="ml-2 opacity-70 hover:opacity-100">✕</button>
+                        </div>
+
+                        <div class="flashcard h-80 md:h-[420px] cursor-pointer mx-auto max-w-lg" onclick="flipCard()">
+                            <div class="flashcard-inner relative w-full h-full">
+                                <!-- 正面 -->
+                                <div class="flashcard-face flashcard-front absolute w-full h-full glass-card rounded-3xl flex flex-col items-center justify-center p-8">
+                                    <span id="card-pos" class="text-base px-4 py-1.5 rounded-full bg-blue-500/20 text-blue-400 mb-4 font-semibold"></span>
+                                    <h2 id="card-word" class="text-5xl md:text-6xl font-black mb-6 text-center"></h2>
+                                    <p id="card-kana" class="text-2xl md:text-3xl font-bold text-blue-200 mb-1 text-center"></p>
+                                    <p id="card-romaji" class="text-sm text-gray-400 mb-3 text-center"></p>
+                                    
+                                    <!-- 語音播放按鈕組 -->
+                                    <div class="flex items-center gap-3 mt-2">
+                                        <button onclick="event.stopPropagation(); speakSlow()" 
+                                            class="w-14 h-14 bg-amber-500/20 border-2 border-amber-500/50 rounded-full flex flex-col items-center justify-center hover:scale-110 transition" 
+                                            title="慢速播放">
+                                            <i class="fa-solid fa-volume-low text-amber-400 text-lg"></i>
+                                            <span class="text-[10px] text-amber-400 mt-0.5">慢速</span>
+                                        </button>
+                                        <button onclick="event.stopPropagation(); speakNormal()" 
+                                            class="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex flex-col items-center justify-center hover:scale-110 transition shadow-lg" 
+                                            title="正常速度播放">
+                                            <i class="fa-solid fa-volume-high text-white text-2xl"></i>
+                                        </button>
+                                        <button onclick="event.stopPropagation(); speakWord()" 
+                                            class="w-14 h-14 bg-green-500/20 border-2 border-green-500/50 rounded-full flex flex-col items-center justify-center hover:scale-110 transition" 
+                                            title="重複播放兩次">
+                                            <i class="fa-solid fa-repeat text-green-400 text-lg"></i>
+                                            <span class="text-[10px] text-green-400 mt-0.5">x2</span>
+                                        </button>
+                                    </div>
+                                    
+                                    <p class="text-gray-400 mt-6 text-base flex items-center gap-2">
+                                        <i class="fa-solid fa-hand-pointer animate-bounce"></i>
+                                        點擊卡片翻轉
+                                    </p>
+                                </div>
+                                <!-- 背面 -->
+                                <div class="flashcard-face flashcard-back absolute w-full h-full glass-card rounded-3xl flex flex-col items-center justify-center p-8 glow-green">
+                                    <h3 id="card-mean" class="text-3xl md:text-4xl font-bold text-green-400 mb-6 text-center"></h3>
+                                    <div class="bg-white/5 rounded-xl p-4 w-full">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-sm text-gray-400">例句：</p>
+                                            <button onclick="event.stopPropagation(); speakExample()" class="px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 text-xs font-bold hover:bg-blue-500/30 transition" title="播放例句">
+                                                <i class="fa-solid fa-volume-high mr-1"></i>播放
+                                            </button>
+                                        </div>
+                                        <p id="card-example" class="text-center text-gray-200 text-lg italic mb-2"></p>
+                                        <p id="card-trans" class="text-center text-gray-400 text-base"></p>
+                                    </div>
+                                    <p id="card-notes" class="text-sm text-amber-300 text-center mt-3"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 閃卡控制按鈕 - 更大更清楚 -->
+                        <div class="mt-8 text-center text-gray-400 text-sm mb-3">
+                            <i class="fa-solid fa-lightbulb text-yellow-500 mr-1"></i>
+                            翻轉卡片後，選擇你對這個單字的熟悉程度：
+                        </div>
+                        <div class="flex justify-center gap-3 md:gap-4">
+                            <button onclick="rateCard('hard')" class="flex-1 max-w-[160px] py-4 md:py-5 rounded-2xl bg-red-500/20 border-2 border-red-500/50 text-red-400 font-bold hover:bg-red-500/30 hover:scale-105 transition text-base md:text-lg">
+                                <i class="fa-solid fa-rotate-right mr-2"></i>再學一次
+                            </button>
+                            <button onclick="rateCard('good')" class="flex-1 max-w-[160px] py-4 md:py-5 rounded-2xl bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-400 font-bold hover:bg-yellow-500/30 hover:scale-105 transition text-base md:text-lg">
+                                <i class="fa-solid fa-check mr-2"></i>有印象
+                            </button>
+                            <button onclick="rateCard('easy')" class="flex-1 max-w-[160px] py-4 md:py-5 rounded-2xl bg-green-500/20 border-2 border-green-500/50 text-green-400 font-bold hover:bg-green-500/30 hover:scale-105 transition text-base md:text-lg">
+                                <i class="fa-solid fa-star mr-2"></i>很熟悉
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 選擇題模式 -->
+                    <div id="view-quiz" class="view-section hidden">
+                        <div class="glass-card rounded-3xl p-6 md:p-8 animate-slide">
+                            <div class="text-center mb-8">
+                                <div class="inline-block bg-blue-500/20 text-blue-400 px-4 py-2 rounded-full text-sm font-semibold mb-4">
+                                    <i class="fa-solid fa-circle-question mr-2"></i>選擇題
+                                </div>
+                                <p class="text-gray-400 mb-4 text-base">這個日文詞彙是什麼意思？</p>
+                                <h2 id="quiz-word" class="text-4xl md:text-5xl font-black mb-4"></h2>
+                                
+                                <!-- 語音按鈕組 -->
+                                <div class="flex items-center justify-center gap-3">
+                                    <button onclick="speakSlow()" class="bg-amber-500/20 border border-amber-500/50 px-4 py-2 rounded-full text-amber-400 font-semibold hover:scale-105 transition text-sm">
+                                        <i class="fa-solid fa-volume-low mr-1"></i>慢速
+                                    </button>
+                                    <button onclick="speakNormal()" class="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-3 rounded-full text-white font-semibold hover:scale-105 transition">
+                                        <i class="fa-solid fa-volume-high mr-2"></i>聽發音
+                                    </button>
+                                    <button onclick="speakWord()" class="bg-green-500/20 border border-green-500/50 px-4 py-2 rounded-full text-green-400 font-semibold hover:scale-105 transition text-sm">
+                                        <i class="fa-solid fa-repeat mr-1"></i>x2
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-center gap-4 mb-4">
+                                <p class="text-gray-400 text-sm">
+                                    <i class="fa-solid fa-hand-pointer mr-1"></i>點選下方正確答案
+                                </p>
+                                <button onclick="showQuizHint()" id="quiz-hint-btn" class="text-xs px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition">
+                                    <i class="fa-solid fa-lightbulb mr-1"></i>提示
+                                </button>
+                            </div>
+                            <div id="quiz-hint" class="hidden text-center text-sm text-amber-300 mb-4 p-3 bg-amber-500/10 rounded-xl">
+                                <!-- 提示內容 -->
+                            </div>
+                            <div id="quiz-options" class="space-y-3 max-w-lg mx-auto">
+                                <!-- 選項動態生成 -->
+                            </div>
+                            <div id="quiz-feedback" class="hidden mt-6 p-5 rounded-2xl text-center text-lg">
+                                <!-- 回饋 -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 拼寫模式 -->
+                    <div id="view-typing" class="view-section hidden">
+                        <div class="glass-card rounded-3xl p-8 animate-slide">
+                            <div class="text-center mb-8">
+                                <span class="text-sm text-gray-400 mb-2 block">請輸入對應的假名或日文詞彙</span>
+                                <h2 id="typing-hint" class="text-3xl font-bold text-green-400 mb-2"></h2>
+                                <p id="typing-pos" class="text-gray-500"></p>
+                            </div>
+
+                            <div class="flex justify-center gap-3 mb-8">
+                                <button onclick="speakSlow()" 
+                                    class="w-14 h-14 bg-amber-500/20 border-2 border-amber-500/50 rounded-full flex flex-col items-center justify-center hover:scale-110 transition"
+                                    title="慢速播放">
+                                    <i class="fa-solid fa-volume-low text-amber-400"></i>
+                                    <span class="text-[9px] text-amber-400">慢速</span>
+                                </button>
+                                <button onclick="speakNormal()" 
+                                    class="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center hover:scale-110 transition shadow-lg"
+                                    title="正常速度">
+                                    <i class="fa-solid fa-volume-high text-2xl text-white"></i>
+                                </button>
+                                <button onclick="speakWord()" 
+                                    class="w-14 h-14 bg-green-500/20 border-2 border-green-500/50 rounded-full flex flex-col items-center justify-center hover:scale-110 transition"
+                                    title="播放兩次">
+                                    <i class="fa-solid fa-repeat text-green-400"></i>
+                                    <span class="text-[9px] text-green-400">x2</span>
+                                </button>
+                            </div>
+
+                            <!-- 輸入區域 (打字 + 語音) -->
+                            <div class="relative max-w-md mx-auto">
+                                <input type="text" id="typing-input" 
+                                    class="typing-input w-full py-2 pr-14"
+                                    placeholder="輸入或說出日文／假名..."
+                                    autocomplete="off"
+                                    onkeypress="if(event.key==='Enter') checkTyping()">
+                                <!-- 語音輸入按鈕 -->
+                                <button onclick="startVoiceInput('typing-input')" id="typing-mic-btn"
+                                    class="absolute right-0 bottom-1 w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center hover:scale-110 transition shadow-lg"
+                                    title="點擊說出答案">
+                                    <i class="fa-solid fa-microphone text-xl"></i>
+                                </button>
+                            </div>
+                            <p class="text-center text-gray-500 text-xs mt-2">
+                                <i class="fa-solid fa-microphone mr-1"></i>點擊麥克風可以用說的
+                            </p>
+
+                            <div id="typing-feedback" class="hidden mt-6 p-4 rounded-xl text-center"></div>
+
+                            <!-- 語音辨識狀態 -->
+                            <div id="voice-status" class="hidden mt-4 text-center">
+                                <div class="inline-flex items-center gap-2 bg-red-500/20 text-red-400 px-4 py-2 rounded-full">
+                                    <span class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                                    <span>正在聆聽...</span>
+                                </div>
+                            </div>
+
+                            <button onclick="checkTyping()" class="btn-primary w-full max-w-md mx-auto block mt-6 py-4 rounded-xl font-bold text-lg">
+                                確認答案
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 聽力模式 -->
+                    <div id="view-listening" class="view-section hidden">
+                        <div class="glass-card rounded-3xl p-8 animate-slide">
+                            <div class="text-center mb-8">
+                                <span class="text-sm text-gray-400 mb-4 block">仔細聆聽，選出你聽到的單字</span>
+                                
+                                <div class="flex items-center justify-center gap-4">
+                                    <!-- 慢速播放 -->
+                                    <button onclick="replayListeningSlow()" 
+                                        class="w-16 h-16 bg-amber-500/20 border-2 border-amber-500/50 rounded-full flex flex-col items-center justify-center hover:scale-110 transition"
+                                        title="超慢速播放">
+                                        <i class="fa-solid fa-volume-low text-amber-400 text-xl"></i>
+                                        <span class="text-[10px] text-amber-400">慢速</span>
+                                    </button>
+                                    
+                                    <!-- 主播放按鈕 -->
+                                    <button onclick="playListeningWord()" class="w-24 h-24 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-full flex flex-col items-center justify-center glow-blue hover:scale-105 transition">
+                                        <i class="fa-solid fa-play text-4xl"></i>
+                                        <span class="text-xs mt-1">播放</span>
+                                    </button>
+                                    
+                                    <!-- 重複播放 -->
+                                    <button onclick="playListeningWord(); setTimeout(playListeningWord, 1500);" 
+                                        class="w-16 h-16 bg-green-500/20 border-2 border-green-500/50 rounded-full flex flex-col items-center justify-center hover:scale-110 transition"
+                                        title="播放兩次">
+                                        <i class="fa-solid fa-repeat text-green-400 text-xl"></i>
+                                        <span class="text-[10px] text-green-400">x2</span>
+                                    </button>
+                                </div>
+
+                                <div class="sound-wave justify-center mt-4 hidden" id="sound-waves">
+                                    <span></span><span></span><span></span><span></span><span></span>
+                                </div>
+                                
+                                <p class="text-gray-500 text-xs mt-3">
+                                    <i class="fa-solid fa-lightbulb text-yellow-500 mr-1"></i>
+                                    聽不清楚？點「慢速」按鈕
+                                </p>
+                            </div>
+
+                            <div id="listening-options" class="grid grid-cols-2 gap-4">
+                                <!-- 選項 -->
+                            </div>
+
+                            <div id="listening-feedback" class="hidden mt-6 p-4 rounded-xl text-center"></div>
+                        </div>
+                    </div>
+
+                    <!-- 文法模式 -->
+                    <div id="view-grammar" class="view-section hidden">
+                        <div class="glass-card rounded-3xl p-8 animate-slide">
+                            <div class="mb-6">
+                                <span class="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-sm font-bold">
+                                    <i class="fa-solid fa-lightbulb mr-1"></i> 文法重點
+                                </span>
+                                <h3 id="grammar-concept" class="text-2xl font-bold mt-3"></h3>
+                                <p id="grammar-explanation" class="text-gray-400 mt-2"></p>
+                            </div>
+
+                            <div id="grammar-quiz" class="space-y-6">
+                                <!-- 文法題目 -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI 對話模式 -->
+            <div id="view-chat" class="view-section hidden h-full flex flex-col">
+                        <div class="glass-card rounded-3xl flex-1 flex flex-col overflow-hidden">
+                            <!-- 對話情境 -->
+                            <div class="p-4 border-b border-white/10 bg-gradient-to-r from-rose-500/20 to-purple-500/20">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center">
+                                        <i class="fa-solid fa-user-tie text-xl"></i>
+                </div>
+                                    <div>
+                                        <h3 id="chat-scenario" class="font-bold">情境對話</h3>
+                                        <p class="text-xs text-gray-400">AI 日語教練</p>
+            </div>
+                                </div>
+                            </div>
+
+                            <!-- 對話區 -->
+                            <div id="chat-messages" class="flex-1 overflow-y-auto hide-scrollbar p-4 space-y-4">
+                                <!-- 訊息 -->
+                            </div>
+
+                            <!-- 輸入區 -->
+                            <div class="p-4 border-t border-white/10">
+                                <div class="flex gap-2">
+                                    <!-- 語音輸入按鈕 -->
+                                    <button onclick="startVoiceInput('chat-input')" id="chat-mic-btn"
+                                        class="w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center hover:scale-110 transition shrink-0"
+                                        title="點擊說日文">
+                                        <i class="fa-solid fa-microphone text-lg"></i>
+                                    </button>
+                                    <input type="text" id="chat-input" 
+                                        class="flex-1 bg-white/10 border border-white/20 rounded-full px-5 py-3 focus:border-rose-500 focus:outline-none transition text-base"
+                                        placeholder="說日文或打字..."
+                                        onkeypress="if(event.key==='Enter') sendChat()">
+                                    <button onclick="sendChat()" class="w-12 h-12 bg-gradient-to-r from-rose-500 to-purple-500 rounded-full flex items-center justify-center hover:opacity-90 hover:scale-105 transition shrink-0" title="發送">
+                                        <i class="fa-solid fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2 text-center">
+                                    <i class="fa-solid fa-microphone text-red-400 mr-1"></i>點麥克風用說的 · 
+                                    <i class="fa-solid fa-keyboard text-blue-400 mr-1"></i>或直接打字
+                                </p>
+                                <!-- 語音辨識狀態 -->
+                                <div id="chat-voice-status" class="hidden mt-2 text-center">
+                                    <div class="inline-flex items-center gap-2 bg-red-500/20 text-red-400 px-4 py-2 rounded-full text-sm">
+                                        <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                        <span>正在聆聽您說的日文...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+        </div>
+    </main>
+        </div>
+    </div>
+
+    <!-- 統計 Modal -->
+    <div id="stats-modal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto hide-scrollbar animate-slide">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold">📊 學習統計</h2>
+                <button onclick="closeStats()" class="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="stat-card rounded-xl p-4 text-center">
+                    <i class="fa-solid fa-fire text-3xl text-orange-500 mb-2"></i>
+                    <div class="text-2xl font-bold" id="stat-streak">0</div>
+                    <div class="text-xs text-gray-400">連續天數</div>
+                </div>
+                <div class="stat-card rounded-xl p-4 text-center">
+                    <i class="fa-solid fa-star text-3xl text-yellow-500 mb-2"></i>
+                    <div class="text-2xl font-bold" id="stat-xp">0</div>
+                    <div class="text-xs text-gray-400">總 XP</div>
+                </div>
+                <div class="stat-card rounded-xl p-4 text-center">
+                    <i class="fa-solid fa-book text-3xl text-green-500 mb-2"></i>
+                    <div class="text-2xl font-bold" id="stat-words">0</div>
+                    <div class="text-xs text-gray-400">已學單字</div>
+                </div>
+                <div class="stat-card rounded-xl p-4 text-center">
+                    <i class="fa-solid fa-bullseye text-3xl text-blue-500 mb-2"></i>
+                    <div class="text-2xl font-bold" id="stat-accuracy">0%</div>
+                    <div class="text-xs text-gray-400">正確率</div>
+                </div>
+            </div>
+
+            <!-- 已學單字列表 -->
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-sm text-gray-400">
+                        <i class="fa-solid fa-list mr-1"></i> 已學單字記錄
+                    </h3>
+                    <button onclick="toggleLearnedWords()" class="text-xs text-blue-400 hover:text-blue-300">
+                        <span id="toggle-words-text">展開</span> <i class="fa-solid fa-chevron-down" id="toggle-words-icon"></i>
+                    </button>
+                </div>
+                <div id="learned-words-list" class="hidden bg-white/5 rounded-xl p-4 max-h-48 overflow-y-auto hide-scrollbar">
+                    <!-- 動態生成 -->
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <button onclick="clearLearnedHistory()" class="w-full py-3 rounded-xl bg-amber-500/20 text-amber-400 font-bold hover:bg-amber-500/30 transition">
+                    <i class="fa-solid fa-eraser mr-2"></i>清除學習記錄（可重新學習）
+                </button>
+                <button onclick="resetAllData()" class="w-full py-3 rounded-xl bg-red-500/20 text-red-400 font-bold hover:bg-red-500/30 transition">
+                    <i class="fa-solid fa-trash-can mr-2"></i>重置所有數據
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 完成動畫 Modal -->
+    <div id="complete-modal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
+        <div class="text-center animate-slide glass-card rounded-3xl p-8 max-w-md">
+            <div class="text-8xl mb-4">🎉</div>
+            <h2 class="text-3xl font-black mb-2">太棒了！</h2>
+            <p class="text-gray-400 mb-4">你完成了這一輪學習</p>
+            <div class="text-5xl font-black text-green-400 mb-4">+<span id="earned-xp">50</span> XP</div>
+            
+            <!-- 本輪統計 -->
+            <div class="grid grid-cols-3 gap-3 mb-6 text-center">
+                <div class="bg-white/5 rounded-xl p-3">
+                    <div class="text-2xl font-bold text-blue-400" id="round-total">5</div>
+                    <div class="text-xs text-gray-400">學習數量</div>
+                </div>
+                <div class="bg-white/5 rounded-xl p-3">
+                    <div class="text-2xl font-bold text-green-400" id="round-correct">0</div>
+                    <div class="text-xs text-gray-400">答對數</div>
+                </div>
+                <div class="bg-white/5 rounded-xl p-3">
+                    <div class="text-2xl font-bold text-amber-400" id="round-accuracy">0%</div>
+                    <div class="text-xs text-gray-400">正確率</div>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="reviewMistakes()" class="flex-1 py-3 rounded-xl bg-amber-500/20 text-amber-400 font-bold hover:bg-amber-500/30 transition">
+                    <i class="fa-solid fa-rotate-left mr-2"></i>複習錯題
+                </button>
+                <button onclick="continuelearning()" class="flex-1 btn-primary py-3 rounded-xl font-bold">
+                    繼續學習 <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音效 -->
+    <audio id="sound-correct" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3" preload="auto"></audio>
+    <audio id="sound-wrong" src="https://assets.mixkit.co/active_storage/sfx/2001/2001-preview.mp3" preload="auto"></audio>
+
+    <script>
+        // ===== 全域狀態 =====
+        const APP_STATE = {
+            currentMode: 'flashcard',
+            currentTopic: 'Daily life Japanese vocabulary',  // 預設主題
+            currentIndex: 0,
+            words: [],
+            historyData: [],
+            isFlipped: false,
+            isAnswered: false,
+            totalCorrect: 0,
+            totalAnswered: 0,
+            roundCorrect: 0,      // 本輪正確數
+            roundTotal: 0,        // 本輪總題數
+            mistakes: [],         // 錯誤題目
+            favorites: []         // 收藏的單字
+        };
+
+        // 主題設定 - label 顯示中文, value 傳給 API
+        const TOPICS = {
+            flashcard: [
+                { label: '゛゜ 拗音・濁音強化', value: 'Youon and dakuten practice for kana' },
+                { label: '🙌 基本問候', value: 'Greetings and self introduction in Japanese' },
+                { label: '🏠 日常生活', value: 'Daily life Japanese vocabulary' },
+                { label: '✈️ 旅遊出行', value: 'Travel Japanese for tourists' },
+                { label: '🍣 餐廳點餐', value: 'Ordering food and drinks in Japanese' },
+                { label: '🛤️ 交通車站', value: 'Train station and transport phrases' },
+                { label: '🛍️ 購物結帳', value: 'Shopping and payments in Japanese' },
+                { label: '🏥 醫院藥局', value: 'Doctor visit and pharmacy Japanese' },
+                { label: '💼 商務敬語入門', value: 'Basic business Japanese and keigo' },
+                { label: '📞 客服客訴', value: 'Customer support and complaint handling' },
+                { label: '👩‍💻 IT/工程', value: 'IT and software development Japanese' },
+                { label: '🎎 禮節文化', value: 'Japanese etiquette and culture' },
+                { label: '🚨 緊急應變', value: 'Emergency and disaster phrases' },
+                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' },
+                { label: '🏨 訂房入住', value: 'Hotel booking and check-in dialogues' },
+                { label: '🚌 問路移動', value: 'Asking directions and transportation' }
+            ],
+            quiz: [
+                { label: '🙌 基本問候', value: 'Greetings and self introduction in Japanese' },
+                { label: '🏠 日常生活', value: 'Daily life Japanese vocabulary' },
+                { label: '✈️ 旅遊出行', value: 'Travel Japanese for tourists' },
+                { label: '🍣 餐廳點餐', value: 'Ordering food and drinks in Japanese' },
+                { label: '🛍️ 購物結帳', value: 'Shopping and payments in Japanese' },
+                { label: '💼 商務敬語入門', value: 'Basic business Japanese and keigo' },
+                { label: '📞 客服客訴', value: 'Customer support and complaint handling' },
+                { label: '👩‍💻 IT/工程', value: 'IT and software development Japanese' },
+                { label: '🚨 緊急應變', value: 'Emergency and disaster phrases' },
+                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' }
+            ],
+            typing: [
+                { label: '゛゜ 拗音・濁音強化', value: 'Youon and dakuten practice for kana' },
+                { label: '🏠 日常生活', value: 'Daily life Japanese vocabulary' },
+                { label: '🍣 餐廳點餐', value: 'Ordering food and drinks in Japanese' },
+                { label: '🛤️ 交通車站', value: 'Train station and transport phrases' },
+                { label: '🛍️ 購物結帳', value: 'Shopping and payments in Japanese' },
+                { label: '📞 客服客訴', value: 'Customer support and complaint handling' },
+                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' }
+            ],
+            listening: [
+                { label: '🙌 基本問候', value: 'Greetings and self introduction in Japanese' },
+                { label: '🏠 日常生活', value: 'Daily life Japanese vocabulary' },
+                { label: '✈️ 旅遊出行', value: 'Travel Japanese for tourists' },
+                { label: '🍣 餐廳點餐', value: 'Ordering food and drinks in Japanese' },
+                { label: '🛤️ 交通車站', value: 'Train station and transport phrases' },
+                { label: '🚨 緊急應變', value: 'Emergency and disaster phrases' },
+                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' }
+            ],
+            grammar: [
+                { label: 'は・が 主題 vs 主語', value: 'Particles wa vs ga usage' },
+                { label: 'を／に／で 的差別', value: 'Particles wo ni de usage' },
+                { label: 'です・ます體與普通形', value: 'Polite vs plain forms' },
+                { label: 'て形的連接', value: 'Te-form connections' },
+                { label: 'ない形否定', value: 'Negative nai form' },
+                { label: 'た形與過去式', value: 'Ta form and past tense' },
+                { label: '可能形表能力', value: 'Potential form' },
+                { label: '〜たい／〜たくない', value: 'Expressing desire tai form' },
+                { label: '原因 から／ので', value: 'Giving reasons with kara/no de' },
+                { label: 'もし〜たら／なら 假設', value: 'Conditional patterns in Japanese' },
+                { label: '〜てもいい／〜てはいけない', value: 'Permission and prohibition' },
+                { label: '敬語入門', value: 'Keigo basics for beginners' },
+                { label: 'クッション言葉', value: 'Softening phrases for politeness' },
+                { label: '電話應對常用句', value: 'Phone call keigo patterns' }
+            ],
+            chat: [
+                { label: '☕ 咖啡廳點餐', value: 'Japanese Coffee Shop' },
+                { label: '🍜 拉麵店用餐', value: 'Ramen shop' },
+                { label: '🛤️ 車站購票', value: 'Train station ticket' },
+                { label: '🏨 飯店入住', value: 'Hotel check-in in Japan' },
+                { label: '🏪 便利商店', value: 'Convenience store in Japan' },
+                { label: '🍺 居酒屋聊天', value: 'Izakaya small talk' },
+                { label: '🗺️ 問路與方向', value: 'Asking for directions in Japanese' },
+                { label: '💊 藥局買藥', value: 'Pharmacy conversation' },
+                { label: '👋 認識新朋友', value: 'Meeting new friends in Japanese' },
+                { label: '📞 客服與抱怨', value: 'Customer support and complaints in Japanese' },
+                { label: '💼 商務會議', value: 'Business meeting in Japanese' },
+                { label: '👩‍💻 專案協作', value: 'Project collaboration in IT' },
+                { label: '🏥 看診描述症狀', value: 'Describing symptoms to a doctor' },
+                { label: '🚨 求助與緊急', value: 'Emergency help in Japanese' },
+                { label: '🎎 禮儀寒暄', value: 'Etiquette and polite small talk' },
+                { label: '🏠 鄰里交流', value: 'Chatting with neighbors' }
+            ],
+            kana: [
+                { label: '🈁 平假名五十音', value: 'Hiragana gojūon (basic vowels and consonants)' },
+                { label: '🈂️ 片假名五十音', value: 'Katakana gojūon (basic vowels and consonants)' }
+            ]
+        };
+
+        // 固定五十音字卡（平假名 / 片假名）
+        const KANA_DECKS = {
+            hiragana: [
+                { word: 'あ', kana: 'あ', romaji: 'a', pos: '假名', mean: 'あ (a)', example: 'あさ', trans: '早晨', notes: '開口短促 a' },
+                { word: 'い', kana: 'い', romaji: 'i', pos: '假名', mean: 'い (i)', example: 'いす', trans: '椅子', notes: '嘴角微張 i' },
+                { word: 'う', kana: 'う', romaji: 'u', pos: '假名', mean: 'う (u)', example: 'うみ', trans: '海', notes: '圓唇短促 u' },
+                { word: 'え', kana: 'え', romaji: 'e', pos: '假名', mean: 'え (e)', example: 'えき', trans: '車站', notes: '微張嘴 e' },
+                { word: 'お', kana: 'お', romaji: 'o', pos: '假名', mean: 'お (o)', example: 'おかね', trans: '錢', notes: '圓唇短促 o' },
+                { word: 'か', kana: 'か', romaji: 'ka', pos: '假名', mean: 'か (ka)', example: 'かさ', trans: '傘', notes: '清音 k 行' },
+                { word: 'き', kana: 'き', romaji: 'ki', pos: '假名', mean: 'き (ki)', example: 'きもち', trans: '心情', notes: 'き /ki/' },
+                { word: 'く', kana: 'く', romaji: 'ku', pos: '假名', mean: 'く (ku)', example: 'くるま', trans: '車', notes: 'く /ku/' },
+                { word: 'け', kana: 'け', romaji: 'ke', pos: '假名', mean: 'け (ke)', example: 'けいさつ', trans: '警察', notes: 'け /ke/' },
+                { word: 'こ', kana: 'こ', romaji: 'ko', pos: '假名', mean: 'こ (ko)', example: 'こども', trans: '小孩', notes: 'こ /ko/' },
+                { word: 'さ', kana: 'さ', romaji: 'sa', pos: '假名', mean: 'さ (sa)', example: 'さかな', trans: '魚', notes: '清音 s 行' },
+                { word: 'し', kana: 'し', romaji: 'shi', pos: '假名', mean: 'し (shi)', example: 'しごと', trans: '工作', notes: '發 /shi/' },
+                { word: 'す', kana: 'す', romaji: 'su', pos: '假名', mean: 'す (su)', example: 'すし', trans: '壽司', notes: 'す /su/' },
+                { word: 'せ', kana: 'せ', romaji: 'se', pos: '假名', mean: 'せ (se)', example: 'せかい', trans: '世界', notes: 'せ /se/' },
+                { word: 'そ', kana: 'そ', romaji: 'so', pos: '假名', mean: 'そ (so)', example: 'そら', trans: '天空', notes: 'そ /so/' },
+                { word: 'た', kana: 'た', romaji: 'ta', pos: '假名', mean: 'た (ta)', example: 'たまご', trans: '雞蛋', notes: '清音 t 行' },
+                { word: 'ち', kana: 'ち', romaji: 'chi', pos: '假名', mean: 'ち (chi)', example: 'ちず', trans: '地圖', notes: '發 /chi/' },
+                { word: 'つ', kana: 'つ', romaji: 'tsu', pos: '假名', mean: 'つ (tsu)', example: 'つき', trans: '月亮', notes: '發 /tsu/' },
+                { word: 'て', kana: 'て', romaji: 'te', pos: '假名', mean: 'て (te)', example: 'てがみ', trans: '信', notes: 'て /te/' },
+                { word: 'と', kana: 'と', romaji: 'to', pos: '假名', mean: 'と (to)', example: 'とけい', trans: '鐘錶', notes: 'と /to/' },
+                { word: 'な', kana: 'な', romaji: 'na', pos: '假名', mean: 'な (na)', example: 'なまえ', trans: '名字', notes: '鼻音 n 行' },
+                { word: 'に', kana: 'に', romaji: 'ni', pos: '假名', mean: 'に (ni)', example: 'にほん', trans: '日本', notes: 'に /ni/' },
+                { word: 'ぬ', kana: 'ぬ', romaji: 'nu', pos: '假名', mean: 'ぬ (nu)', example: 'ぬの', trans: '布', notes: 'ぬ /nu/' },
+                { word: 'ね', kana: 'ね', romaji: 'ne', pos: '假名', mean: 'ね (ne)', example: 'ねこ', trans: '貓', notes: 'ね /ne/' },
+                { word: 'の', kana: 'の', romaji: 'no', pos: '假名', mean: 'の (no)', example: 'のり', trans: '海苔', notes: 'の /no/' },
+                { word: 'は', kana: 'は', romaji: 'ha', pos: '假名', mean: 'は (ha)', example: 'はな', trans: '花／鼻', notes: '作助詞讀 wa' },
+                { word: 'ひ', kana: 'ひ', romaji: 'hi', pos: '假名', mean: 'ひ (hi)', example: 'ひる', trans: '中午', notes: 'ひ /hi/' },
+                { word: 'ふ', kana: 'ふ', romaji: 'fu', pos: '假名', mean: 'ふ (fu)', example: 'ふね', trans: '船', notes: '唇齒音 /fu/' },
+                { word: 'へ', kana: 'へ', romaji: 'he', pos: '假名', mean: 'へ (he)', example: 'へや', trans: '房間', notes: '作助詞讀 e' },
+                { word: 'ほ', kana: 'ほ', romaji: 'ho', pos: '假名', mean: 'ほ (ho)', example: 'ほし', trans: '星星', notes: 'ほ /ho/' },
+                { word: 'ま', kana: 'ま', romaji: 'ma', pos: '假名', mean: 'ま (ma)', example: 'まど', trans: '窗戶', notes: '鼻音 m 行' },
+                { word: 'み', kana: 'み', romaji: 'mi', pos: '假名', mean: 'み (mi)', example: 'みず', trans: '水', notes: 'み /mi/' },
+                { word: 'む', kana: 'む', romaji: 'mu', pos: '假名', mean: 'む (mu)', example: 'むし', trans: '昆蟲', notes: 'む /mu/' },
+                { word: 'め', kana: 'め', romaji: 'me', pos: '假名', mean: 'め (me)', example: 'めがね', trans: '眼鏡', notes: 'め /me/' },
+                { word: 'も', kana: 'も', romaji: 'mo', pos: '假名', mean: 'も (mo)', example: 'もも', trans: '桃子', notes: 'も /mo/' },
+                { word: 'や', kana: 'や', romaji: 'ya', pos: '假名', mean: 'や (ya)', example: 'やさい', trans: '蔬菜', notes: '半母音 y 行' },
+                { word: 'ゆ', kana: 'ゆ', romaji: 'yu', pos: '假名', mean: 'ゆ (yu)', example: 'ゆき', trans: '雪', notes: 'ゆ /yu/' },
+                { word: 'よ', kana: 'よ', romaji: 'yo', pos: '假名', mean: 'よ (yo)', example: 'よる', trans: '夜晚', notes: 'よ /yo/' },
+                { word: 'ら', kana: 'ら', romaji: 'ra', pos: '假名', mean: 'ら (ra)', example: 'らーめん', trans: '拉麵', notes: '舌尖彈音 /ra/' },
+                { word: 'り', kana: 'り', romaji: 'ri', pos: '假名', mean: 'り (ri)', example: 'りんご', trans: '蘋果', notes: 'り /ri/' },
+                { word: 'る', kana: 'る', romaji: 'ru', pos: '假名', mean: 'る (ru)', example: 'るす', trans: '不在家', notes: 'る /ru/' },
+                { word: 'れ', kana: 'れ', romaji: 're', pos: '假名', mean: 'れ (re)', example: 'れきし', trans: '歷史', notes: 'れ /re/' },
+                { word: 'ろ', kana: 'ろ', romaji: 'ro', pos: '假名', mean: 'ろ (ro)', example: 'ろうか', trans: '走廊', notes: 'ろ /ro/' },
+                { word: 'ゐ', kana: 'ゐ', romaji: 'wi', pos: '假名', mean: 'ゐ (wi)', example: 'ゐなか', trans: '鄉下（古用）', notes: '歷史假名，現多用 い' },
+                { word: 'ゑ', kana: 'ゑ', romaji: 'we', pos: '假名', mean: 'ゑ (we)', example: 'ゑびす', trans: '惠比壽（古用）', notes: '歷史假名，現多用 え' },
+                { word: 'わ', kana: 'わ', romaji: 'wa', pos: '假名', mean: 'わ (wa)', example: 'わたし', trans: '我', notes: '助詞も讀 wa' },
+                { word: 'を', kana: 'を', romaji: 'o/wo', pos: '假名', mean: 'を (助詞發 o)', example: 'りんごを たべる', trans: '吃蘋果', notes: '做賓語助詞時讀 o' },
+                { word: 'ん', kana: 'ん', romaji: 'n', pos: '假名', mean: 'ん (n)', example: 'ほん', trans: '書', notes: '收尾鼻音 n' },
+                { word: 'っ', kana: 'っ', romaji: 'small tsu', pos: '假名', mean: '促音（っ）', example: 'きって', trans: '郵票', notes: '雙寫子音，停頓一拍' }
+            ],
+            katakana: [
+                { word: 'ア', kana: 'ア', romaji: 'a', pos: '假名', mean: 'ア (a)', example: 'アイス', trans: '冰淇淋', notes: '片假名 a' },
+                { word: 'イ', kana: 'イ', romaji: 'i', pos: '假名', mean: 'イ (i)', example: 'インク', trans: '墨水', notes: '片假名 i' },
+                { word: 'ウ', kana: 'ウ', romaji: 'u', pos: '假名', mean: 'ウ (u)', example: 'ウミ', trans: '海', notes: '片假名 u' },
+                { word: 'エ', kana: 'エ', romaji: 'e', pos: '假名', mean: 'エ (e)', example: 'エレベーター', trans: '電梯', notes: '片假名 e' },
+                { word: 'オ', kana: 'オ', romaji: 'o', pos: '假名', mean: 'オ (o)', example: 'オレンジ', trans: '柳橙', notes: '片假名 o' },
+                { word: 'カ', kana: 'カ', romaji: 'ka', pos: '假名', mean: 'カ (ka)', example: 'カメラ', trans: '相機', notes: '清音 k' },
+                { word: 'キ', kana: 'キ', romaji: 'ki', pos: '假名', mean: 'キ (ki)', example: 'キッチン', trans: '廚房', notes: 'キ /ki/' },
+                { word: 'ク', kana: 'ク', romaji: 'ku', pos: '假名', mean: 'ク (ku)', example: 'クラブ', trans: '俱樂部', notes: 'ク /ku/' },
+                { word: 'ケ', kana: 'ケ', romaji: 'ke', pos: '假名', mean: 'ケ (ke)', example: 'ケーキ', trans: '蛋糕', notes: 'ケ /ke/' },
+                { word: 'コ', kana: 'コ', romaji: 'ko', pos: '假名', mean: 'コ (ko)', example: 'コーヒー', trans: '咖啡', notes: 'コ /ko/' },
+                { word: 'サ', kana: 'サ', romaji: 'sa', pos: '假名', mean: 'サ (sa)', example: 'サラダ', trans: '沙拉', notes: 'サ /sa/' },
+                { word: 'シ', kana: 'シ', romaji: 'shi', pos: '假名', mean: 'シ (shi)', example: 'シャツ', trans: '襯衫', notes: '發 /shi/' },
+                { word: 'ス', kana: 'ス', romaji: 'su', pos: '假名', mean: 'ス (su)', example: 'スーパー', trans: '超市', notes: 'ス /su/' },
+                { word: 'セ', kana: 'セ', romaji: 'se', pos: '假名', mean: 'セ (se)', example: 'セーター', trans: '毛衣', notes: 'セ /se/' },
+                { word: 'ソ', kana: 'ソ', romaji: 'so', pos: '假名', mean: 'ソ (so)', example: 'ソーダ', trans: '蘇打', notes: 'ソ /so/' },
+                { word: 'タ', kana: 'タ', romaji: 'ta', pos: '假名', mean: 'タ (ta)', example: 'タクシー', trans: '計程車', notes: 'タ /ta/' },
+                { word: 'チ', kana: 'チ', romaji: 'chi', pos: '假名', mean: 'チ (chi)', example: 'チケット', trans: '票券', notes: '發 /chi/' },
+                { word: 'ツ', kana: 'ツ', romaji: 'tsu', pos: '假名', mean: 'ツ (tsu)', example: 'ツアー', trans: '旅遊行程', notes: '發 /tsu/' },
+                { word: 'テ', kana: 'テ', romaji: 'te', pos: '假名', mean: 'テ (te)', example: 'テレビ', trans: '電視', notes: 'テ /te/' },
+                { word: 'ト', kana: 'ト', romaji: 'to', pos: '假名', mean: 'ト (to)', example: 'トマト', trans: '番茄', notes: 'ト /to/' },
+                { word: 'ナ', kana: 'ナ', romaji: 'na', pos: '假名', mean: 'ナ (na)', example: 'ナイフ', trans: '刀子', notes: 'ナ /na/' },
+                { word: 'ニ', kana: 'ニ', romaji: 'ni', pos: '假名', mean: 'ニ (ni)', example: 'ニュース', trans: '新聞', notes: 'ニ /ni/' },
+                { word: 'ヌ', kana: 'ヌ', romaji: 'nu', pos: '假名', mean: 'ヌ (nu)', example: 'ヌードル', trans: '麵', notes: 'ヌ /nu/' },
+                { word: 'ネ', kana: 'ネ', romaji: 'ne', pos: '假名', mean: 'ネ (ne)', example: 'ネクタイ', trans: '領帶', notes: 'ネ /ne/' },
+                { word: 'ノ', kana: 'ノ', romaji: 'no', pos: '假名', mean: 'ノ (no)', example: 'ノート', trans: '筆記本', notes: 'ノ /no/' },
+                { word: 'ハ', kana: 'ハ', romaji: 'ha', pos: '假名', mean: 'ハ (ha)', example: 'ハンバーガー', trans: '漢堡', notes: '作助詞讀 wa' },
+                { word: 'ヒ', kana: 'ヒ', romaji: 'hi', pos: '假名', mean: 'ヒ (hi)', example: 'ヒーター', trans: '暖氣', notes: 'ヒ /hi/' },
+                { word: 'フ', kana: 'フ', romaji: 'fu', pos: '假名', mean: 'フ (fu)', example: 'フルーツ', trans: '水果', notes: '唇齒音 /fu/' },
+                { word: 'ヘ', kana: 'ヘ', romaji: 'he', pos: '假名', mean: 'ヘ (he)', example: 'ヘア', trans: '頭髮', notes: '作助詞讀 e' },
+                { word: 'ホ', kana: 'ホ', romaji: 'ho', pos: '假名', mean: 'ホ (ho)', example: 'ホテル', trans: '飯店', notes: 'ホ /ho/' },
+                { word: 'マ', kana: 'マ', romaji: 'ma', pos: '假名', mean: 'マ (ma)', example: 'マンガ', trans: '漫畫', notes: 'マ /ma/' },
+                { word: 'ミ', kana: 'ミ', romaji: 'mi', pos: '假名', mean: 'ミ (mi)', example: 'ミルク', trans: '牛奶', notes: 'ミ /mi/' },
+                { word: 'ム', kana: 'ム', romaji: 'mu', pos: '假名', mean: 'ム (mu)', example: 'ムービー', trans: '電影', notes: 'ム /mu/' },
+                { word: 'メ', kana: 'メ', romaji: 'me', pos: '假名', mean: 'メ (me)', example: 'メニュー', trans: '菜單', notes: 'メ /me/' },
+                { word: 'モ', kana: 'モ', romaji: 'mo', pos: '假名', mean: 'モ (mo)', example: 'モデル', trans: '模特兒', notes: 'モ /mo/' },
+                { word: 'ヤ', kana: 'ヤ', romaji: 'ya', pos: '假名', mean: 'ヤ (ya)', example: 'ヤクルト', trans: '養樂多', notes: 'ヤ /ya/' },
+                { word: 'ユ', kana: 'ユ', romaji: 'yu', pos: '假名', mean: 'ユ (yu)', example: 'ユニフォーム', trans: '制服', notes: 'ユ /yu/' },
+                { word: 'ヨ', kana: 'ヨ', romaji: 'yo', pos: '假名', mean: 'ヨ (yo)', example: 'ヨーグルト', trans: '優格', notes: 'ヨ /yo/' },
+                { word: 'ラ', kana: 'ラ', romaji: 'ra', pos: '假名', mean: 'ラ (ra)', example: 'ラジオ', trans: '收音機', notes: '彈舌 /ra/' },
+                { word: 'リ', kana: 'リ', romaji: 'ri', pos: '假名', mean: 'リ (ri)', example: 'リスト', trans: '清單', notes: 'リ /ri/' },
+                { word: 'ル', kana: 'ル', romaji: 'ru', pos: '假名', mean: 'ル (ru)', example: 'ルーム', trans: '房間', notes: 'ル /ru/' },
+                { word: 'レ', kana: 'レ', romaji: 're', pos: '假名', mean: 'レ (re)', example: 'レストラン', trans: '餐廳', notes: 'レ /re/' },
+                { word: 'ロ', kana: 'ロ', romaji: 'ro', pos: '假名', mean: 'ロ (ro)', example: 'ロボット', trans: '機器人', notes: 'ロ /ro/' },
+                { word: 'ヰ', kana: 'ヰ', romaji: 'wi', pos: '假名', mean: 'ヰ (wi)', example: 'ヰスキー', trans: '威士忌（舊標記）', notes: '歷史假名，現多用 イ' },
+                { word: 'ヱ', kana: 'ヱ', romaji: 'we', pos: '假名', mean: 'ヱ (we)', example: 'ヱビス', trans: '惠比壽（舊標記）', notes: '歷史假名，現多用 エ' },
+                { word: 'ワ', kana: 'ワ', romaji: 'wa', pos: '假名', mean: 'ワ (wa)', example: 'ワイン', trans: '紅酒', notes: 'ワ /wa/' },
+                { word: 'ヲ', kana: 'ヲ', romaji: 'o/wo', pos: '假名', mean: 'ヲ (助詞發 o)', example: 'ヲタク', trans: '御宅族', notes: '助詞讀 o' },
+                { word: 'ン', kana: 'ン', romaji: 'n', pos: '假名', mean: 'ン (n)', example: 'パン', trans: '麵包', notes: '鼻音 n' },
+                { word: 'ッ', kana: 'ッ', romaji: 'small tsu', pos: '假名', mean: '促音（ッ）', example: 'カップ', trans: '杯子', notes: '雙寫子音，停頓一拍' }
+            ]
+        };
+
+        // 濁音 / 半濁音 / 拗音 / 促音 / 長音 / 特殊發音
+        const KANA_EXTRA = {
+            hiragana: {
+                dakuten: [
+                    { word: 'が', romaji: 'ga' }, { word: 'ぎ', romaji: 'gi' }, { word: 'ぐ', romaji: 'gu' }, { word: 'げ', romaji: 'ge' }, { word: 'ご', romaji: 'go' },
+                    { word: 'ざ', romaji: 'za' }, { word: 'じ', romaji: 'ji' }, { word: 'ず', romaji: 'zu' }, { word: 'ぜ', romaji: 'ze' }, { word: 'ぞ', romaji: 'zo' },
+                    { word: 'だ', romaji: 'da' }, { word: 'ぢ', romaji: 'ji/di' }, { word: 'づ', romaji: 'zu/du' }, { word: 'で', romaji: 'de' }, { word: 'ど', romaji: 'do' },
+                    { word: 'ば', romaji: 'ba' }, { word: 'び', romaji: 'bi' }, { word: 'ぶ', romaji: 'bu' }, { word: 'べ', romaji: 'be' }, { word: 'ぼ', romaji: 'bo' }
+                ],
+                handaku: [
+                    { word: 'ぱ', romaji: 'pa' }, { word: 'ぴ', romaji: 'pi' }, { word: 'ぷ', romaji: 'pu' }, { word: 'ぺ', romaji: 'pe' }, { word: 'ぽ', romaji: 'po' }
+                ],
+                youon: [
+                    { word: 'きゃ', romaji: 'kya' }, { word: 'きゅ', romaji: 'kyu' }, { word: 'きょ', romaji: 'kyo' }, { word: 'しゃ', romaji: 'sha' }, { word: 'しゅ', romaji: 'shu' },
+                    { word: 'しょ', romaji: 'sho' }, { word: 'ちゃ', romaji: 'cha' }, { word: 'ちゅ', romaji: 'chu' }, { word: 'ちょ', romaji: 'cho' }, { word: 'にゃ', romaji: 'nya' },
+                    { word: 'にゅ', romaji: 'nyu' }, { word: 'にょ', romaji: 'nyo' }, { word: 'ひゃ', romaji: 'hya' }, { word: 'ひゅ', romaji: 'hyu' }, { word: 'ひょ', romaji: 'hyo' },
+                    { word: 'みゃ', romaji: 'mya' }, { word: 'みゅ', romaji: 'myu' }, { word: 'みょ', romaji: 'myo' }, { word: 'りゃ', romaji: 'rya' }, { word: 'りゅ', romaji: 'ryu' },
+                    { word: 'りょ', romaji: 'ryo' }, { word: 'ぎゃ', romaji: 'gya' }, { word: 'ぎゅ', romaji: 'gyu' }, { word: 'ぎょ', romaji: 'gyo' }, { word: 'じゃ', romaji: 'ja' },
+                    { word: 'じゅ', romaji: 'ju' }, { word: 'じょ', romaji: 'jo' }, { word: 'びゃ', romaji: 'bya' }, { word: 'びゅ', romaji: 'byu' }, { word: 'びょ', romaji: 'byo' },
+                    { word: 'ぴゃ', romaji: 'pya' }, { word: 'ぴゅ', romaji: 'pyu' }, { word: 'ぴょ', romaji: 'pyo' }
+                ],
+                sokuon: [
+                    { word: 'っ', romaji: '促音', notes: '雙寫子音，停一拍' }
+                ],
+                choon: [
+                    { word: 'ー', romaji: '長音', notes: '前音拉長一拍' }
+                ],
+                special: [
+                    { word: 'じ/ぢ', romaji: 'ji/di', notes: '實際多念 ji' },
+                    { word: 'ず/づ', romaji: 'zu/du', notes: '實際多念 zu' }
+                ]
+            },
+            katakana: {
+                dakuten: [
+                    { word: 'ガ', romaji: 'ga' }, { word: 'ギ', romaji: 'gi' }, { word: 'グ', romaji: 'gu' }, { word: 'ゲ', romaji: 'ge' }, { word: 'ゴ', romaji: 'go' },
+                    { word: 'ザ', romaji: 'za' }, { word: 'ジ', romaji: 'ji' }, { word: 'ズ', romaji: 'zu' }, { word: 'ゼ', romaji: 'ze' }, { word: 'ゾ', romaji: 'zo' },
+                    { word: 'ダ', romaji: 'da' }, { word: 'ヂ', romaji: 'ji/di' }, { word: 'ヅ', romaji: 'zu/du' }, { word: 'デ', romaji: 'de' }, { word: 'ド', romaji: 'do' },
+                    { word: 'バ', romaji: 'ba' }, { word: 'ビ', romaji: 'bi' }, { word: 'ブ', romaji: 'bu' }, { word: 'ベ', romaji: 'be' }, { word: 'ボ', romaji: 'bo' }
+                ],
+                handaku: [
+                    { word: 'パ', romaji: 'pa' }, { word: 'ピ', romaji: 'pi' }, { word: 'プ', romaji: 'pu' }, { word: 'ペ', romaji: 'pe' }, { word: 'ポ', romaji: 'po' }
+                ],
+                youon: [
+                    { word: 'キャ', romaji: 'kya' }, { word: 'キュ', romaji: 'kyu' }, { word: 'キョ', romaji: 'kyo' }, { word: 'シャ', romaji: 'sha' }, { word: 'シュ', romaji: 'shu' },
+                    { word: 'ショ', romaji: 'sho' }, { word: 'チャ', romaji: 'cha' }, { word: 'チュ', romaji: 'chu' }, { word: 'チョ', romaji: 'cho' }, { word: 'ニャ', romaji: 'nya' },
+                    { word: 'ニュ', romaji: 'nyu' }, { word: 'ニョ', romaji: 'nyo' }, { word: 'ヒャ', romaji: 'hya' }, { word: 'ヒュ', romaji: 'hyu' }, { word: 'ヒョ', romaji: 'hyo' },
+                    { word: 'ミャ', romaji: 'mya' }, { word: 'ミュ', romaji: 'myu' }, { word: 'ミョ', romaji: 'myo' }, { word: 'リャ', romaji: 'rya' }, { word: 'リュ', romaji: 'ryu' },
+                    { word: 'リョ', romaji: 'ryo' }, { word: 'ギャ', romaji: 'gya' }, { word: 'ギュ', romaji: 'gyu' }, { word: 'ギョ', romaji: 'gyo' }, { word: 'ジャ', romaji: 'ja' },
+                    { word: 'ジュ', romaji: 'ju' }, { word: 'ジョ', romaji: 'jo' }, { word: 'ビャ', romaji: 'bya' }, { word: 'ビュ', romaji: 'byu' }, { word: 'ビョ', romaji: 'byo' },
+                    { word: 'ピャ', romaji: 'pya' }, { word: 'ピュ', romaji: 'pyu' }, { word: 'ピョ', romaji: 'pyo' }
+                ],
+                sokuon: [
+                    { word: 'ッ', romaji: '促音', notes: '雙寫子音，停一拍' }
+                ],
+                choon: [
+                    { word: 'ー', romaji: '長音', notes: '外來語常見長音' }
+                ],
+                special: [
+                    { word: 'ジ/ヂ', romaji: 'ji/di', notes: '實際多念 ji' },
+                    { word: 'ズ/ヅ', romaji: 'zu/du', notes: '實際多念 zu' }
+                ]
+            }
+        };
+
+        let apiKey = localStorage.getItem('gemini_api_key');
+        let userData = JSON.parse(localStorage.getItem('linguamax_user') || '{}');
+
+        // ===== 初始化 =====
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!apiKey) {
+                document.getElementById('key-modal').classList.remove('hidden');
+            } else {
+                document.getElementById('key-modal').classList.add('hidden');
+                initApp();
+            }
+        });
+
+        function saveApiKey() {
+            const val = document.getElementById('api-key-input').value.trim();
+            if (val) {
+                apiKey = val;
+                localStorage.setItem('gemini_api_key', apiKey);
+                document.getElementById('key-modal').classList.add('hidden');
+                initApp();
+            }
+        }
+
+        function initApp() {
+            loadUserData();
+            updateTopics();
+            loadContent();
+            checkStreak();
+        }
+
+        // ===== 用戶數據 =====
+        function loadUserData() {
+            if (!userData.xp) {
+                userData = { 
+                    xp: 0, 
+                    streak: 0, 
+                    wordsLearned: [],      // 學過的單字列表
+                    learnedHistory: {},    // 按主題分類的學習記錄
+                    totalCorrect: 0, 
+                    totalAnswered: 0, 
+                    lastActive: null 
+                };
+            }
+            // 兼容舊版本
+            if (!userData.learnedHistory) userData.learnedHistory = {};
+            
+            updateUI();
+        }
+
+        function saveUserData() {
+            localStorage.setItem('linguamax_user', JSON.stringify(userData));
+            updateUI();
+        }
+
+        // 取得某主題已學過的單字
+        function getLearnedWordsForTopic(topic) {
+            return userData.learnedHistory[topic] || [];
+        }
+
+        // 儲存學過的單字到記錄
+        function saveLearnedWord(word, topic) {
+            if (!userData.learnedHistory[topic]) {
+                userData.learnedHistory[topic] = [];
+            }
+            if (!userData.learnedHistory[topic].includes(word)) {
+                userData.learnedHistory[topic].push(word);
+            }
+            if (!userData.wordsLearned.includes(word)) {
+                userData.wordsLearned.push(word);
+            }
+            saveUserData();
+        }
+
+        function updateUI() {
+            document.getElementById('xp-count').textContent = userData.xp + ' XP';
+            document.getElementById('streak-count').textContent = userData.streak;
+            document.getElementById('today-learned').textContent = Math.min(userData.wordsLearned?.length || 0, 20);
+            document.getElementById('daily-progress').style.width = Math.min((userData.wordsLearned?.length || 0) / 20 * 100, 100) + '%';
+            
+            // 等級系統
+            const levelInfo = calculateLevel(userData.xp);
+            document.getElementById('user-level').textContent = levelInfo.level;
+            document.getElementById('user-level-badge').textContent = levelInfo.badge;
+            document.getElementById('xp-to-next').textContent = levelInfo.currentXP;
+            document.getElementById('xp-needed').textContent = levelInfo.xpNeeded;
+            document.getElementById('level-progress').style.width = levelInfo.progress + '%';
+        }
+
+        // 等級計算（每 100 XP 升一級，逐漸增加）
+        function calculateLevel(totalXP) {
+            const levels = [
+                { level: 1, badge: '🌱', xp: 0 },
+                { level: 2, badge: '🌿', xp: 100 },
+                { level: 3, badge: '🌳', xp: 250 },
+                { level: 4, badge: '🌲', xp: 500 },
+                { level: 5, badge: '🎋', xp: 800 },
+                { level: 6, badge: '🎄', xp: 1200 },
+                { level: 7, badge: '🏔️', xp: 1700 },
+                { level: 8, badge: '⛰️', xp: 2300 },
+                { level: 9, badge: '🗻', xp: 3000 },
+                { level: 10, badge: '🌟', xp: 4000 },
+                { level: 11, badge: '⭐', xp: 5000 },
+                { level: 12, badge: '💫', xp: 6500 },
+                { level: 13, badge: '✨', xp: 8000 },
+                { level: 14, badge: '🔥', xp: 10000 },
+                { level: 15, badge: '👑', xp: 12500 }
+            ];
+            
+            let currentLevel = levels[0];
+            let nextLevel = levels[1];
+            
+            for (let i = 0; i < levels.length - 1; i++) {
+                if (totalXP >= levels[i].xp) {
+                    currentLevel = levels[i];
+                    nextLevel = levels[i + 1];
+                }
+            }
+            
+            // 最高級
+            if (totalXP >= levels[levels.length - 1].xp) {
+                currentLevel = levels[levels.length - 1];
+                return {
+                    level: currentLevel.level,
+                    badge: currentLevel.badge,
+                    currentXP: totalXP - currentLevel.xp,
+                    xpNeeded: '∞',
+                    progress: 100
+                };
+            }
+            
+            const xpInLevel = totalXP - currentLevel.xp;
+            const xpForLevel = nextLevel.xp - currentLevel.xp;
+            const progress = Math.round(xpInLevel / xpForLevel * 100);
+            
+            return {
+                level: currentLevel.level,
+                badge: currentLevel.badge,
+                currentXP: xpInLevel,
+                xpNeeded: xpForLevel,
+                progress
+            };
+        }
+
+        function checkStreak() {
+            const today = new Date().toDateString();
+            const lastActive = userData.lastActive;
+            
+            if (lastActive) {
+                const lastDate = new Date(lastActive);
+                const daysDiff = Math.floor((new Date(today) - lastDate) / (1000 * 60 * 60 * 24));
+                
+                if (daysDiff > 1) {
+                    userData.streak = 0; // 斷連
+                }
+            }
+        }
+
+        function addXP(amount) {
+            userData.xp += amount;
+            userData.lastActive = new Date().toDateString();
+            
+            // 更新連續天數
+            const today = new Date().toDateString();
+            if (userData.lastActive !== today) {
+                userData.streak++;
+            }
+            
+            saveUserData();
+            showXPPopup(amount);
+        }
+
+        function showXPPopup(amount) {
+            const popup = document.createElement('div');
+            popup.className = 'xp-popup fixed top-20 left-1/2 -translate-x-1/2 text-2xl font-bold text-yellow-400 z-50';
+            popup.textContent = `+${amount} XP`;
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 1500);
+        }
+
+        // ===== 模式切換 =====
+        function switchMode(mode) {
+            APP_STATE.currentMode = mode;
+            APP_STATE.historyData = [];
+            APP_STATE.currentIndex = 0;
+
+            // 如果切到五十音模式，預設平假名
+            if (mode === 'kana') {
+                const levelSelect = document.getElementById('level-select');
+                const topicSelect = document.getElementById('topic-select');
+                if (levelSelect) levelSelect.value = 'KANA_HIRA';
+                APP_STATE.currentTopic = 'Hiragana gojūon (basic vowels and consonants)';
+                APP_STATE.kanaStart = 0;
+                if (topicSelect) topicSelect.value = APP_STATE.currentTopic;
+            } else {
+                // 離開五十音模式時，如果等級仍為假名模式，重置到 N5
+                const levelSelect = document.getElementById('level-select');
+                if (levelSelect && (levelSelect.value === 'KANA_HIRA' || levelSelect.value === 'KANA_KATA')) {
+                    levelSelect.value = 'N5';
+                }
+            }
+
+            // 更新桌面版導航 UI
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('bg-green-500/20', 'border-green-500', 'text-green-400');
+                btn.classList.add('border-transparent');
+                if (btn.dataset.mode === mode) {
+                    btn.classList.add('bg-green-500/20', 'border-green-500', 'text-green-400');
+                    btn.classList.remove('border-transparent');
+                }
+            });
+
+            // 更新手機版導航 UI
+            document.querySelectorAll('.mobile-mode-btn').forEach(btn => {
+                btn.classList.remove('bg-green-500/20', 'border-green-500', 'text-green-400');
+                btn.classList.add('border-transparent');
+                if (btn.dataset.mode === mode) {
+                    btn.classList.add('bg-green-500/20', 'border-green-500', 'text-green-400');
+                    btn.classList.remove('border-transparent');
+                }
+            });
+
+            // 顯示對應視圖
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${mode}`).classList.remove('hidden');
+
+            // 顯示/隱藏進度條
+            if (['flashcard', 'quiz', 'typing', 'listening', 'kana'].includes(mode)) {
+                document.getElementById('session-progress').classList.remove('hidden');
+            } else {
+                document.getElementById('session-progress').classList.add('hidden');
+            }
+
+            updateTopics();
+            loadContent();
+        }
+
+        function updateTopics() {
+            const select = document.getElementById('topic-select');
+            const topics = TOPICS[APP_STATE.currentMode] || [];
+            
+            // 更新下拉選單
+            select.innerHTML = topics.map((t, i) => `
+                <option value="${t.value}">${t.label}</option>
+            `).join('');
+
+            // 設定第一個主題為預設
+            if (topics.length > 0) {
+                APP_STATE.currentTopic = topics[0].value;
+                select.value = topics[0].value;
+            }
+            
+            // 同時更新手機版
+            updateMobileTopicSelect();
+        }
+
+        // 五十音專區快速進入
+        function startKanaSession(type) {
+            setKanaSession(type);
+        }
+
+        // 切換平假名 / 片假名模式
+        function switchKanaMode(type) {
+            setKanaSession(type);
+        }
+
+        function setKanaSession(type) {
+            // 強制切換到五十音模式
+            switchMode('kana');
+
+            const levelSelect = document.getElementById('level-select');
+            const topicSelect = document.getElementById('topic-select');
+
+            // 設定等級與主題
+            if (type === 'hiragana') {
+                if (levelSelect) levelSelect.value = 'KANA_HIRA';
+                APP_STATE.currentTopic = 'Hiragana gojūon (basic vowels and consonants)';
+            } else {
+                if (levelSelect) levelSelect.value = 'KANA_KATA';
+                APP_STATE.currentTopic = 'Katakana gojūon (basic vowels and consonants)';
+            }
+
+            // 同步下拉
+            if (topicSelect) topicSelect.value = APP_STATE.currentTopic;
+            const mobileTopic = document.getElementById('mobile-topic-select');
+            if (mobileTopic) mobileTopic.value = APP_STATE.currentTopic;
+
+            // 重置 session 狀態並載入
+            APP_STATE.historyData = [];
+            APP_STATE.currentIndex = 0;
+            APP_STATE.kanaStart = 0;
+            loadContent();
+        }
+
+        // 主題下拉選單變更
+        function onTopicChange() {
+            const select = document.getElementById('topic-select');
+            APP_STATE.currentTopic = select.value;
+            APP_STATE.historyData = [];
+            
+            // 同步手機版選單
+            const mobileSelect = document.getElementById('mobile-topic-select');
+            if (mobileSelect) mobileSelect.value = select.value;
+            
+            loadContent();
+        }
+
+        function selectTopic(topicValue) {
+            APP_STATE.currentTopic = topicValue;
+            APP_STATE.historyData = [];
+            
+            // 更新下拉選單
+            const select = document.getElementById('topic-select');
+            if (select) select.value = topicValue;
+            
+            const mobileSelect = document.getElementById('mobile-topic-select');
+            if (mobileSelect) mobileSelect.value = topicValue;
+
+            loadContent();
+        }
+
+        // 重新生成內容（換一批）
+        function regenerateContent() {
+            // 把當前的單字加入排除列表，確保下次不會重複
+            if (APP_STATE.words && APP_STATE.words.length > 0) {
+                APP_STATE.words.forEach(w => {
+                    if (!APP_STATE.historyData.includes(w.word)) {
+                        APP_STATE.historyData.push(w.word);
+                    }
+                });
+            }
+            APP_STATE.currentIndex = 0;
+            loadContent();
+        }
+
+        // 難度等級變更時重新載入內容
+        function onLevelChange() {
+            const level = document.getElementById('level-select').value;
+            console.log('難度切換至:', level);
+            
+            // 清空當前 session 的歷史（但保留持久化的記錄）
+            APP_STATE.historyData = [];
+            APP_STATE.currentIndex = 0;
+            
+            // 重新載入內容
+            loadContent();
+        }
+
+        // ===== Gemini API 直接呼叫 (不需要 server.js) =====
+        const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+        // CEFR 等級描述
+        const LEVEL_DESCRIPTIONS = {
+            'N5': '零基礎入門，平假名/片假名與最常用詞彙、簡單ます形',
+            'N4': '基礎日常對話，基本語法（て形、ない形）與常用詞彙',
+            'N3': '中級日常與旅遊，較長句子、常見敬語、閱讀短文',
+            'N2': '中高級職場與新聞，複雜句型與敬語表達',
+            'N1': '高階閱讀與專業場合，長句、細膩語感',
+            'SURVIVAL': '旅日生存必備：交通、購物、緊急求助、簡易敬語，句子短易用',
+            'TRAVEL_PLUS': '觀光進階：訂房、餐廳客訴、問路細節、景點對話、推薦詢問',
+            'BIZ_KEIGO': '職場敬語：電話應對、會議表達、客戶應對、緩衝語與道歉',
+            'CASUAL': '日常俗語：朋友聊天、ネットスラング、輕鬆口語，注意場合',
+            'IT_DEV': 'IT/工程：開發協作、需求溝通、簡易技術用語（前端/後端/infra）',
+            'KANA_HIRA': '專注平假名五十音，清音/濁音/拗音，輸出以假名為主',
+            'KANA_KATA': '專注片假名五十音與外來語發音，輸出以片假名為主',
+            'CONVO': '會話流暢度優先，提供可複誦的短句與情境對答'
+        };
+
+        // 隨機指令，增加內容多樣性
+        const VARIETY_INSTRUCTIONS = [
+            'Always include kana reading (hiragana/katakana) and short romaji.',
+            'Mix easy and slightly tricky words learners often confuse.',
+            'Prioritize real-life phrases usable in Japan right away.',
+            'Add one onomatopoeia (擬聲語/擬態語) when appropriate.',
+            'Give both polite (〜ます) and casual usages in examples when possible.',
+            'Include at least one katakana loanword if the level allows.',
+            'Highlight pitch-accent sensitive words in the notes field.',
+            'Favor vocabulary that practices verb forms like て形/ない形/可能形.',
+            'Avoid textbook clichés; choose fresh, natural expressions.'
+        ];
+
+        // 取得隨機指令
+        function getRandomInstruction() {
+            return VARIETY_INSTRUCTIONS[Math.floor(Math.random() * VARIETY_INSTRUCTIONS.length)];
+        }
+
+        // 產生隨機種子字母，增加變化
+        function getRandomSeed() {
+            const letters = 'abcdefghijklmnopqrstuvwxyz';
+            const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+            const seeds = [
+                `Start with words beginning with "${randomLetter.toUpperCase()}".`,
+                `Avoid words starting with common letters like A, B, C, E, S, T.`,
+                `Include at least one word with 3+ syllables.`,
+                `Include words from different word families.`,
+                `Mix formal and informal vocabulary.`,
+                ''  // 有時不加限制
+            ];
+            return seeds[Math.floor(Math.random() * seeds.length)];
+        }
+
+        // 生成 Prompt
+        function generatePrompt(type, topic, level, exclude, userMessage) {
+            // 如果是五十音固定課程，直接跳過 API
+            if (isKanaMode(level, topic) && ['vocab', 'flashcard', 'quiz', 'typing', 'listening'].includes(type)) {
+                return null;
+            }
+
+            const excludeText = (exclude && exclude.length > 0) ? exclude.join(", ") : "None";
+            const levelDesc = LEVEL_DESCRIPTIONS[level] || LEVEL_DESCRIPTIONS['B1'];
+            const randomInstruction = getRandomInstruction();
+            const randomSeed = getRandomSeed();
+            const timestamp = Date.now(); // 增加時間戳確保每次不同
+
+            // 常見單字黑名單（避免 AI 總是生成這些）
+            const commonWordsToAvoid = 'です, ます, はい, いいえ, こんにちは, さようなら, ありがとう, ごめんなさい, 学生, 先生, 日本, 東京, 水, ご飯, 行く, 来る, する, 見る, 食べる, 飲む, 買う, いる, ある, きれい, 大きい, 小さい';
+
+            // 針對不同等級的額外指示
+            const examInstructions = {
+                'N5': 'Keep vocabulary simple, mostly kana + very common kanji with furigana. Use short です/ます examples.',
+                'N4': 'Use everyday verbs with て形/ない形 examples, keep sentences short.',
+                'N3': 'Include casual vs polite contrast and common set phrases.',
+                'N2': 'Add keigo or semi-formal wording, slightly longer sentences.',
+                'N1': 'Include nuanced or idiomatic expressions; add a short note about nuance.',
+                'KANA_HIRA': 'Only use hiragana (no kanji). Cover gojūon, dakuten, and youon combinations.',
+                'KANA_KATA': 'Use katakana loanwords and onomatopoeia. Avoid hiragana except unavoidable particles.',
+                'CONVO': 'Prioritize short, repeatable conversational chunks useful in real talk.'
+            };
+            const extraInstruction = examInstructions[level] || '';
+
+            switch (type) {
+                case 'vocab':
+                    return `You are an expert Japanese teacher for Traditional Chinese speakers. Generate UNIQUE Japanese vocabulary with kana.
+
+**Context:**
+- Topic: "${topic}"
+- Level: ${level} (${levelDesc})
+- Request ID: ${timestamp} (generate different words each time)
+${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
+
+**IMPORTANT EXCLUSIONS - Do NOT use these words:**
+- Already learned: [${excludeText}]
+- Too common/basic: [${commonWordsToAvoid}]
+
+**Special Instructions for variety:**
+- ${randomInstruction}
+- ${randomSeed}
+
+**Conversation Goal:** Pick vocabulary that helps the learner talk with Japanese people naturally. Examples must sound like real dialogue lines a native might say in daily life. Include politeness/場面 tips in notes when relevant.
+
+**Task:** Generate exactly 5 UNIQUE Japanese vocabulary items that:
+1. Fit the topic "${topic}" and level ${level}
+2. Include kana reading and romaji
+3. Avoid all exclusions above
+4. Are memorable and practical in Japan
+5. Prefer real-life, natural expressions
+
+**Output Format (JSON only, no markdown):**
+{
+    "title": "Topic title in Japanese",
+    "words": [
+        {
+            "word": "日本語の単語（漢字可。KANA level must use kana only）",
+            "kana": "かな or カナ",
+            "romaji": "romaji reading",
+            "pos": "詞性 (名詞/動詞/形容詞/句型...)",
+            "mean": "繁體中文解釋（簡潔）",
+            "example": "自然的日文例句，盡量含假名與常用句型",
+            "trans": "例句的繁體中文翻譯",
+            "notes": "可選：發音或敬語/語感提示"
+        }
+    ]
+}`;
+
+                case 'grammar':
+                    return `You are an expert Japanese grammar teacher creating interactive quiz content.
+
+**Context:**
+- Grammar Topic: "${topic}"
+- Level: ${level} (${levelDesc})
+- Previously used content to avoid: [${excludeText}]
+
+**Task:** Create a grammar lesson with 3 quiz questions for Japanese learners (Traditional Chinese UI).
+
+**Output Format (JSON only, no markdown):**
+{
+    "concept": "日文文法概念 (Japanese)",
+    "explanation": "清晰的繁體中文解釋，包含用法與常見錯誤",
+    "example_sentences": ["Example 1 (Japanese)", "Example 2 (Japanese)"],
+    "quiz": [
+        {
+            "question": "填空或選擇題（日文句子，可含中文提示）",
+            "options": ["option1", "option2", "option3", "option4"],
+            "answer": 2,
+            "reason": "繁體中文說明為什麼正確"
+        }
+    ]
+}`;
+
+                case 'chat':
+                    return `You are an AI Japanese conversation partner in a language learning app.
+
+**Scenario:** ${topic}
+**User's Level:** ${level} (${levelDesc})
+**User said:** "${userMessage}"
+
+**Your Task:**
+1. Reply naturally in Japanese as the other person in this scenario.
+2. Keep the language appropriate for ${level} level.
+3. Provide helpful feedback on the user's Japanese.
+4. Give a score (0-100) based on grammar, vocabulary, and naturalness.
+
+**Output Format (JSON only, no markdown):**
+{
+    "reply": "你的日文回覆 (2-3 sentences, keep natural)",
+    "chinese": "回覆的繁體中文翻譯",
+    "score": 85,
+    "feedback": "對用戶日文的具體建議（用繁體中文）"
+}`;
+
+                default:
+                    return `Generate a simple greeting in JSON format: {"message": "Hello!"}`;
+            }
+        }
+
+        // 呼叫 Gemini API
+        async function callGeminiAPI(prompt) {
+            const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+                    method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        temperature: 1.0,  // 提高隨機性
+                        topP: 0.95,        // 增加多樣性
+                        topK: 40,
+                        maxOutputTokens: 2048
+                    }
+                    })
+                });
+                
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error?.message || 'API 呼叫失敗');
+            }
+
+            const result = await response.json();
+            const text = result.candidates[0].content.parts[0].text;
+            
+            // 清理 JSON（移除 markdown 標記）
+            let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const firstBrace = cleanText.indexOf('{');
+            const lastBrace = cleanText.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+            }
+            
+            return JSON.parse(cleanText);
+        }
+
+        // Fisher-Yates shuffle for better randomness
+        function shuffleArray(arr) {
+            const result = [...arr];
+            for (let i = result.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [result[i], result[j]] = [result[j], result[i]];
+            }
+            return result;
+        }
+
+        // ===== 內容載入 =====
+        async function loadContent() {
+            if (APP_STATE.currentMode === 'chat') {
+                initChat();
+                return;
+            }
+
+            document.getElementById('loading').classList.remove('hidden');
+
+            try {
+                const level = document.getElementById('level-select').value;
+                const topic = APP_STATE.currentTopic;
+                const isKana = isKanaMode(level, topic);
+
+                // 五十音固定卡片：直接載入本地資料
+                if (isKana) {
+                    const deck = getKanaDeck(level);
+                    APP_STATE.words = deck;
+                    APP_STATE.kanaStart = APP_STATE.kanaStart || 0;
+                    APP_STATE.historyData = [];
+                    APP_STATE.currentIndex = 0;
+                    renderCurrentMode();
+                } else {
+                    const type = ['flashcard', 'quiz', 'typing', 'listening'].includes(APP_STATE.currentMode) 
+                        ? 'vocab' 
+                        : APP_STATE.currentMode;
+                    
+                    // 合併持久化的學習記錄 + 當前 session 的記錄
+                    const persistentHistory = getLearnedWordsForTopic(APP_STATE.currentTopic);
+                    const allExcluded = [...new Set([...persistentHistory, ...APP_STATE.historyData])];
+                    
+                    const prompt = generatePrompt(
+                        type,
+                        APP_STATE.currentTopic,
+                        document.getElementById('level-select').value,
+                        allExcluded
+                    );
+
+                    const data = await callGeminiAPI(prompt);
+                    
+                    if (data.words) {
+                        APP_STATE.words = shuffleArray(data.words);
+                        APP_STATE.words.forEach(w => APP_STATE.historyData.push(w.word));
+                        APP_STATE.currentIndex = 0;
+                        renderCurrentMode();
+                    } else if (data.concept) {
+                        renderGrammar(data);
+                    }
+                }
+
+            } catch (e) {
+                console.error(e);
+                alert('載入失敗：' + e.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function renderCurrentMode() {
+            updateProgress();
+            
+            switch (APP_STATE.currentMode) {
+                case 'kana':
+                    renderKana();
+                    break;
+                case 'flashcard':
+                    renderFlashcard();
+                    break;
+                case 'quiz':
+                    renderQuiz();
+                    break;
+                case 'typing':
+                    renderTyping();
+                    break;
+                case 'listening':
+                    renderListening();
+                    break;
+            }
+        }
+
+        // 判斷是否為五十音模式
+        function isKanaMode(level, topic) {
+            return APP_STATE.currentMode === 'kana';
+        }
+
+        // 取得對應的五十音卡片
+        function getKanaDeck(level) {
+            if (level === 'KANA_KATA') return KANA_DECKS.katakana;
+            return KANA_DECKS.hiragana;
+        }
+
+
+        function updateProgress() {
+            const total = Math.max(APP_STATE.words.length, 1);
+            const current = Math.min(APP_STATE.currentIndex + 1, total);
+            document.getElementById('current-idx').textContent = current;
+            document.getElementById('total-items').textContent = total;
+            document.getElementById('session-bar').style.width = (current / total * 100) + '%';
+        }
+
+        // ===== 閃卡模式 =====
+        // 清除 HTML 標籤（API 有時會回傳帶標籤的內容）
+        function stripHtml(text) {
+            if (!text) return '';
+            return text.replace(/<[^>]*>/g, '').trim();
+        }
+
+        function renderFlashcard() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (!word) return;
+
+            // 重置翻轉狀態
+            document.querySelector('.flashcard').classList.remove('flipped');
+            APP_STATE.isFlipped = false;
+
+            document.getElementById('card-word').textContent = stripHtml(word.word);
+            document.getElementById('card-pos').textContent = stripHtml(word.pos);
+            document.getElementById('card-kana').textContent = stripHtml(word.kana) || '';
+            document.getElementById('card-romaji').textContent = word.romaji ? `羅馬音：${stripHtml(word.romaji)}` : '';
+            document.getElementById('card-mean').textContent = stripHtml(word.mean);
+            document.getElementById('card-example').textContent = `"${stripHtml(word.example)}"`;
+            document.getElementById('card-trans').textContent = stripHtml(word.trans) || '';
+            document.getElementById('card-notes').textContent = stripHtml(word.notes) || '';
+        }
+
+        function flipCard() {
+            const card = document.querySelector('.flashcard');
+            card.classList.toggle('flipped');
+            APP_STATE.isFlipped = !APP_STATE.isFlipped;
+        }
+
+        function rateCard(rating) {
+            let xp = 0;
+            switch (rating) {
+                case 'hard': xp = 5; break;
+                case 'good': xp = 10; break;
+                case 'easy': xp = 15; break;
+            }
+            
+            addXP(xp);
+            
+            // 記錄學過的單字（持久化儲存）
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (word) {
+                saveLearnedWord(word.word, APP_STATE.currentTopic);
+            }
+
+            nextWord();
+        }
+
+        // ===== 選擇題模式 =====
+        function renderQuiz() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (!word) return;
+
+            APP_STATE.isAnswered = false;
+            document.getElementById('quiz-word').textContent = stripHtml(word.word);
+            document.getElementById('quiz-feedback').classList.add('hidden');
+            document.getElementById('quiz-hint').classList.add('hidden');
+            document.getElementById('quiz-hint-btn').classList.remove('hidden');
+
+            // 生成選項 (1個正確 + 3個錯誤)
+            const options = [word.mean];
+            const otherWords = APP_STATE.words.filter((w, i) => i !== APP_STATE.currentIndex);
+            while (options.length < 4 && otherWords.length > 0) {
+                const idx = Math.floor(Math.random() * otherWords.length);
+                if (!options.includes(otherWords[idx].mean)) {
+                    options.push(otherWords[idx].mean);
+                }
+                otherWords.splice(idx, 1);
+            }
+
+            // 補足選項
+            const fillers = ['蘋果', '書本', '電腦', '音樂', '城市'];
+            while (options.length < 4) {
+                options.push(fillers[options.length]);
+            }
+
+            // 打亂順序
+            options.sort(() => Math.random() - 0.5);
+
+            document.getElementById('quiz-options').innerHTML = options.map((opt, i) => `
+                <button onclick="checkQuizAnswer(this, '${stripHtml(opt).replace(/'/g, "\\'")}', '${stripHtml(word.mean).replace(/'/g, "\\'")}')" 
+                    class="btn-option w-full py-4 rounded-xl text-left px-6 text-lg font-semibold">
+                    ${stripHtml(opt)}
+                </button>
+                `).join('');
+        }
+
+        // 顯示測驗提示
+        function showQuizHint() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (!word) return;
+            
+            let hint = '';
+            if (word.kana) hint += `讀音：${word.kana}`;
+            if (word.romaji) hint += (hint ? ' / ' : '') + word.romaji;
+            if (word.example) hint += `<br>例句：${word.example}`;
+            if (word.notes) hint += `<br>💡 ${word.notes}`;
+            
+            if (!hint) hint = '這題沒有額外提示，相信自己！';
+            
+            document.getElementById('quiz-hint').innerHTML = hint;
+            document.getElementById('quiz-hint').classList.remove('hidden');
+            document.getElementById('quiz-hint-btn').classList.add('hidden');
+            
+            // 使用提示扣 XP
+            addXP(-2);
+        }
+
+        function checkQuizAnswer(btn, selected, correct) {
+            if (APP_STATE.isAnswered) return;
+            APP_STATE.isAnswered = true;
+
+            const isCorrect = selected === correct;
+            userData.totalAnswered++;
+            APP_STATE.roundTotal++;
+            if (isCorrect) {
+                userData.totalCorrect++;
+                APP_STATE.roundCorrect++;
+            } else {
+                // 記錄錯題
+                const currentWord = APP_STATE.words[APP_STATE.currentIndex];
+                if (currentWord && !APP_STATE.mistakes.find(m => m.word === currentWord.word)) {
+                    APP_STATE.mistakes.push(currentWord);
+                }
+            }
+            saveUserData();
+
+            if (isCorrect) {
+                btn.classList.add('correct');
+                playSound('correct');
+                addXP(10);
+                showFeedback('quiz-feedback', true, '答對了！', '');
+            } else {
+                btn.classList.add('wrong');
+                playSound('wrong');
+                showFeedback('quiz-feedback', false, '再想想...', `正確答案：${correct}`);
+                
+                // 顯示正確答案
+                document.querySelectorAll('#quiz-options button').forEach(b => {
+                    if (b.textContent.trim() === correct) {
+                        b.classList.add('correct');
+                    }
+                });
+            }
+
+            setTimeout(nextWord, 1500);
+        }
+
+        // ===== 拼寫模式 =====
+        function renderTyping() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (!word) return;
+
+            APP_STATE.isAnswered = false;
+            document.getElementById('typing-hint').textContent = stripHtml(word.mean);
+            document.getElementById('typing-pos').textContent = word.kana 
+                ? `假名：${stripHtml(word.kana)}${word.romaji ? ` / ${stripHtml(word.romaji)}` : ''}` 
+                : stripHtml(word.pos) || '';
+            document.getElementById('typing-input').value = '';
+            document.getElementById('typing-feedback').classList.add('hidden');
+            document.getElementById('typing-input').focus();
+        }
+
+        function checkTyping() {
+            if (APP_STATE.isAnswered) return;
+            
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            const input = document.getElementById('typing-input').value.trim().toLowerCase();
+            const answers = [word.word, word.kana, word.romaji].filter(Boolean).map(v => v.trim().toLowerCase());
+
+            APP_STATE.isAnswered = true;
+            userData.totalAnswered++;
+            APP_STATE.roundTotal++;
+
+            if (answers.includes(input)) {
+                userData.totalCorrect++;
+                APP_STATE.roundCorrect++;
+                saveUserData();
+                playSound('correct');
+                addXP(15);
+                showFeedback('typing-feedback', true, '完美！', '');
+                confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+            } else {
+                // 記錄錯題
+                if (!APP_STATE.mistakes.find(m => m.word === word.word)) {
+                    APP_STATE.mistakes.push(word);
+                }
+                saveUserData();
+                playSound('wrong');
+                showFeedback('typing-feedback', false, '差一點！', `正確答案：${word.word}（${word.kana || ''}）`);
+            }
+
+            setTimeout(nextWord, 1500);
+        }
+
+        // ===== 聽力模式 =====
+        function renderListening() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (!word) return;
+
+            APP_STATE.isAnswered = false;
+            document.getElementById('listening-feedback').classList.add('hidden');
+
+            // 生成選項
+            const correctWord = word.kana || word.word;
+            const options = [correctWord];
+            const otherWords = APP_STATE.words.filter((w, i) => i !== APP_STATE.currentIndex);
+            while (options.length < 4 && otherWords.length > 0) {
+                const idx = Math.floor(Math.random() * otherWords.length);
+                const candidate = otherWords[idx].kana || otherWords[idx].word;
+                if (!options.includes(candidate)) {
+                    options.push(candidate);
+                }
+                otherWords.splice(idx, 1);
+            }
+            options.sort(() => Math.random() - 0.5);
+
+            document.getElementById('listening-options').innerHTML = options.map(opt => `
+                <button onclick="checkListeningAnswer(this, '${stripHtml(opt)}', '${stripHtml(correctWord)}')" 
+                    class="btn-option py-6 rounded-xl text-lg font-bold">
+                    ${stripHtml(opt)}
+                </button>
+            `).join('');
+
+            // 自動播放
+            setTimeout(playListeningWord, 500);
+        }
+
+        function playListeningWord() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (!word) return;
+            
+            // 聽力模式用較慢速度，更清晰
+            const speakTarget = word.kana || word.word;
+            speakText(speakTarget, 0.65);
+            
+            document.getElementById('sound-waves').classList.remove('hidden');
+            setTimeout(() => document.getElementById('sound-waves').classList.add('hidden'), 2000);
+        }
+
+        // 聽力模式重新播放（慢速）
+        function replayListeningSlow() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (word) {
+                const speakTarget = word.kana || word.word;
+                speakText(speakTarget, 0.45);
+            }
+        }
+
+        // 播放對話訊息
+        function speakChatMessage(btn, rate = 0.8) {
+            const text = btn.dataset.text;
+            if (text) {
+                // 還原 HTML 實體
+                const decodedText = text.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+                speakText(decodedText, rate);
+            }
+        }
+
+        function checkListeningAnswer(btn, selected, correct) {
+            if (APP_STATE.isAnswered) return;
+            APP_STATE.isAnswered = true;
+
+            userData.totalAnswered++;
+            APP_STATE.roundTotal++;
+            const isCorrect = selected === correct;
+            if (isCorrect) {
+                userData.totalCorrect++;
+                APP_STATE.roundCorrect++;
+            } else {
+                // 記錄錯題
+                const currentWord = APP_STATE.words[APP_STATE.currentIndex];
+                if (currentWord && !APP_STATE.mistakes.find(m => m.word === currentWord.word)) {
+                    APP_STATE.mistakes.push(currentWord);
+                }
+            }
+            saveUserData();
+
+            if (isCorrect) {
+                btn.classList.add('correct');
+                playSound('correct');
+                addXP(10);
+                showFeedback('listening-feedback', true, '聽力很棒！', '');
+            } else {
+                btn.classList.add('wrong');
+                playSound('wrong');
+                showFeedback('listening-feedback', false, '再聽一次', `正確答案：${correct}`);
+            }
+
+            setTimeout(nextWord, 1500);
+        }
+
+        // ===== 文法模式 =====
+        function renderGrammar(data) {
+            document.getElementById('grammar-concept').textContent = stripHtml(data.concept);
+            document.getElementById('grammar-explanation').textContent = stripHtml(data.explanation);
+
+            document.getElementById('grammar-quiz').innerHTML = data.quiz.map((q, idx) => `
+                <div class="bg-white/5 rounded-xl p-4">
+                    <p class="font-bold mb-3">${stripHtml(q.question)}</p>
+                    <div class="space-y-2">
+                                        ${q.options.map((opt, i) => `
+                            <button onclick="checkGrammarAnswer(this, ${i}, ${q.answer}, '${stripHtml(q.reason).replace(/'/g, "\\'")}')"
+                                class="btn-option w-full py-3 px-4 rounded-lg text-left text-sm">
+                                                ${stripHtml(opt)}
+                                            </button>
+                                        `).join('')}
+                                    </div>
+                    <div class="grammar-feedback hidden mt-3 p-3 rounded-lg text-sm"></div>
+                                </div>
+            `).join('');
+        }
+
+        // ===== 五十音模式 =====
+        function renderKana() {
+            const container = document.getElementById('kana-grid');
+            const extra = document.getElementById('kana-extra');
+            if (!container) return;
+            if (!extra) return;
+
+            const deck = APP_STATE.words || [];
+            const byKana = Object.fromEntries(deck.map(item => [(item.kana || item.word), item]));
+
+            const H_PATTERN = [
+                ['あ','い','う','え','お'],
+                ['か','き','く','け','こ'],
+                ['さ','し','す','せ','そ'],
+                ['た','ち','つ','て','と'],
+                ['な','に','ぬ','ね','の'],
+                ['は','ひ','ふ','へ','ほ'],
+                ['ま','み','む','め','も'],
+                ['や','','ゆ','','よ'],
+                ['ら','り','る','れ','ろ'],
+                ['わ','ゐ','','ゑ','を'],
+                ['ん','','','',''],
+                ['っ','','','','']
+            ];
+
+            const K_PATTERN = [
+                ['ア','イ','ウ','エ','オ'],
+                ['カ','キ','ク','ケ','コ'],
+                ['サ','シ','ス','セ','ソ'],
+                ['タ','チ','ツ','テ','ト'],
+                ['ナ','ニ','ヌ','ネ','ノ'],
+                ['ハ','ヒ','フ','ヘ','ホ'],
+                ['マ','ミ','ム','メ','モ'],
+                ['ヤ','','ユ','','ヨ'],
+                ['ラ','リ','ル','レ','ロ'],
+                ['ワ','ヰ','','ヱ','ヲ'],
+                ['ン','','','',''],
+                ['ッ','','','','']
+            ];
+
+            const pattern = deck.some(d => (d.kana || d.word).match(/^[ア-ンヴーヱヲヰッ]/)) ? K_PATTERN : H_PATTERN;
+            const script = pattern === K_PATTERN ? 'katakana' : 'hiragana';
+
+            const rowsHtml = pattern.map(row => row.map(k => renderKanaCell(k, byKana)).join('')).join('');
+
+            APP_STATE.currentIndex = 0; // 進度條顯示 1 / 50
+            container.innerHTML = rowsHtml;
+            extra.innerHTML = renderKanaExtra(byKana, script);
+        }
+
+        function speakKana(text, rate = 0.8) {
+            if (!text) return;
+            speakText(text, rate);
+        }
+
+        function renderKanaCell(k, byKana) {
+            if (!k) {
+                return `<div class="glass-card rounded-2xl p-4 text-center opacity-30">—</div>`;
+            }
+            const w = byKana[k];
+            const text = k;
+            const romaji = w?.romaji ? `羅馬音：${w.romaji}` : '';
+            const mean = w?.mean || '';
+            const notes = w?.notes || '';
+            return `
+            <div class="glass-card rounded-2xl p-4 text-center">
+                <div class="text-sm px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 inline-block mb-2">假名</div>
+                <div class="text-4xl md:text-5xl font-black mb-2">${text}</div>
+                <div class="text-sm text-gray-300 mb-1">${romaji}</div>
+                <div class="text-base text-emerald-300 mb-1">${mean}</div>
+                <div class="text-xs text-amber-200 mb-2">${notes}</div>
+                <div class="flex justify-center gap-2">
+                    <button onclick="speakKana('${text}', 0.55)" class="w-9 h-9 bg-amber-500/20 border border-amber-400/40 rounded-full flex items-center justify-center hover:scale-110 transition" title="慢速">
+                        <i class="fa-solid fa-volume-low text-amber-200 text-sm"></i>
+                    </button>
+                    <button onclick="speakKana('${text}', 0.85)" class="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center hover:scale-110 transition shadow-lg" title="播放">
+                        <i class="fa-solid fa-volume-high text-white"></i>
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        function renderKanaExtra(byKana, script) {
+            const data = KANA_EXTRA[script];
+            if (!data) return '';
+
+            const block = (title, items) => {
+                if (!items || items.length === 0) return '';
+                const chunks = [];
+                for (let i = 0; i < items.length; i += 5) {
+                    chunks.push(items.slice(i, i + 5));
+                }
+                const dict = Object.fromEntries(items.map(it => [it.word, it]));
+                const rows = chunks.map(row => row.map(k => k ? renderKanaCell(k.word, dict) : renderKanaCell('', {})).join('')).join('');
+                return `
+                <div class="mt-6">
+                    <div class="text-sm font-bold text-emerald-300 mb-2">${title}</div>
+                    <div class="grid grid-cols-5 gap-3 md:gap-4">
+                        ${rows}
+                    </div>
+                </div>`;
+            };
+
+            return [
+                block('濁音', data.dakuten),
+                block('半濁音', data.handaku),
+                block('拗音', data.youon),
+                block('促音', data.sokuon),
+                block('長音', data.choon),
+                block('特殊發音', data.special)
+            ].join('');
+        }
+
+        function checkGrammarAnswer(btn, selected, correct, reason) {
+            const container = btn.closest('.space-y-2');
+            const feedback = btn.closest('.bg-white\\/5').querySelector('.grammar-feedback');
+            
+            if (selected === correct) {
+                btn.classList.add('correct');
+                playSound('correct');
+                addXP(10);
+                feedback.innerHTML = `<span class="text-green-400">✓ ${reason}</span>`;
+            } else {
+                btn.classList.add('wrong');
+                playSound('wrong');
+                feedback.innerHTML = `<span class="text-red-400">✗ ${reason}</span>`;
+            }
+            feedback.classList.remove('hidden');
+
+            // 禁用所有選項
+            container.querySelectorAll('button').forEach(b => b.disabled = true);
+        }
+
+        // ===== AI 對話模式 =====
+        // 取得主題的中文標籤
+        function getTopicLabel(value) {
+            const topics = TOPICS[APP_STATE.currentMode] || [];
+            const topic = topics.find(t => t.value === value);
+            return topic ? topic.label : value;
+        }
+
+        // 情境對話的中文歡迎語
+        const CHAT_GREETINGS = {
+            'Japanese Coffee Shop': { greeting: 'いらっしゃいませ。コーヒーはホットとアイス、どちらにされますか？', chinese: '歡迎光臨，咖啡要熱的還是冰的呢？' },
+            'Ramen shop': { greeting: 'いらっしゃい！食券はお買い求めですか？おすすめは醤油ラーメンですよ。', chinese: '歡迎！有先買食券嗎？推薦醬油拉麵喔。' },
+            'Train station ticket': { greeting: 'どちらまで行かれますか？ICカードはお持ちですか？', chinese: '請問要到哪一站？有 IC 卡嗎？' },
+            'Hotel check-in in Japan': { greeting: 'ようこそお越しくださいました。ご予約のお名前を頂けますか？', chinese: '歡迎光臨，請告訴我預訂的名字。' },
+            'Convenience store in Japan': { greeting: 'いらっしゃいませ。袋はご利用になりますか？', chinese: '歡迎光臨，需要購物袋嗎？' },
+            'Izakaya small talk': { greeting: 'こんばんは！お飲み物は何にしますか？生ビールでよろしいですか？', chinese: '晚上好！想先喝點什麼？要生啤嗎？' },
+            'Asking for directions in Japanese': { greeting: 'こんにちは。どちらへ行きたいですか？近い道をお伝えしますね。', chinese: '你好，想去哪裡？我告訴你較近的路線。' },
+            'Pharmacy conversation': { greeting: 'こんにちは。どのような症状ですか？熱はありますか？', chinese: '你好，哪裡不舒服？有發燒嗎？' },
+            'Meeting new friends in Japanese': { greeting: 'はじめまして！どこから来ましたか？日本は初めてですか？', chinese: '初次見面！你從哪裡來？第一次來日本嗎？' }
+        };
+
+        function initChat() {
+            const scenarioValue = APP_STATE.currentTopic;
+            const scenarioLabel = getTopicLabel(scenarioValue);
+            const chatInfo = CHAT_GREETINGS[scenarioValue] || { 
+                greeting: `Hi! Welcome to our ${scenarioValue} scenario. Let's practice Japanese conversation together.`,
+                chinese: `嗨！歡迎來到${scenarioLabel}情境。讓我們練習日語對話。`
+            };
+
+            document.getElementById('chat-scenario').textContent = scenarioLabel;
+            document.getElementById('chat-messages').innerHTML = `
+                <div class="flex gap-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-robot text-lg"></i>
+                    </div>
+                    <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[80%]">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="text-lg flex-1">${chatInfo.greeting}</p>
+                            <button onclick="speakChatMessage(this)" data-text="${chatInfo.greeting.replace(/"/g, '&quot;')}" 
+                                class="shrink-0 w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="播放語音">
+                                <i class="fa-solid fa-volume-high text-sm"></i>
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-2 border-t border-white/10 pt-2">${chatInfo.chinese}</p>
+                        <p class="text-xs text-blue-400 mt-2"><i class="fa-solid fa-lightbulb mr-1"></i>提示：用日文回覆，練習對話！</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const messagesContainer = document.getElementById('chat-messages');
+
+            // 顯示用戶訊息
+            messagesContainer.innerHTML += `
+                <div class="flex gap-3 justify-end">
+                    <div class="bg-blue-500/20 border border-blue-500/30 rounded-2xl rounded-tr-sm p-4 max-w-[80%]">
+                        <p>${message}</p>
+                        </div>
+                                </div>
+            `;
+
+            input.value = '';
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            // 顯示載入
+            const loadingId = 'typing-' + Date.now();
+            messagesContainer.innerHTML += `
+                <div id="${loadingId}" class="flex gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="glass-card rounded-2xl rounded-tl-sm p-4">
+                        <div class="flex gap-1">
+                            <span class="w-2 h-2 bg-white/50 rounded-full animate-bounce"></span>
+                            <span class="w-2 h-2 bg-white/50 rounded-full animate-bounce" style="animation-delay: 0.1s"></span>
+                            <span class="w-2 h-2 bg-white/50 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                        </div>
+                        </div>
+                    </div>
+                `;
+
+            try {
+                const prompt = generatePrompt(
+                    'chat',
+                    APP_STATE.currentTopic,
+                    document.getElementById('level-select').value,
+                    [],
+                    message
+                );
+
+                const data = await callGeminiAPI(prompt);
+                document.getElementById(loadingId).remove();
+
+                // AI 回覆 - 轉義引號避免 HTML 問題
+                const safeReply = data.reply.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                
+                messagesContainer.innerHTML += `
+                    <div class="flex gap-3 animate-slide">
+                        <div class="w-10 h-10 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[80%]">
+                            <div class="flex items-start justify-between gap-2">
+                                <p class="flex-1">${data.reply}</p>
+                                <div class="shrink-0 flex gap-1">
+                                    <button onclick="speakChatMessage(this, 0.6)" data-text="${safeReply}" 
+                                        class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速播放">
+                                        <i class="fa-solid fa-volume-low text-xs"></i>
+                                    </button>
+                                    <button onclick="speakChatMessage(this, 0.85)" data-text="${safeReply}" 
+                                        class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常播放">
+                                        <i class="fa-solid fa-volume-high text-sm"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">${data.chinese}</p>
+                            ${data.feedback ? `<p class="text-xs text-yellow-400 mt-2 border-t border-white/10 pt-2">💡 ${data.feedback}</p>` : ''}
+                            ${data.score ? `<div class="mt-2 flex items-center gap-2">
+                                <span class="text-xs text-gray-400">表達評分</span>
+                                <div class="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                                    <div class="h-full ${data.score >= 80 ? 'bg-green-500' : data.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}" style="width: ${data.score}%"></div>
+                                </div>
+                                <span class="text-xs font-bold">${data.score}</span>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                addXP(5);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            } catch (e) {
+                document.getElementById(loadingId).remove();
+                console.error(e);
+                alert('對話失敗：' + e.message);
+            }
+        }
+
+        // ===== 工具函數 =====
+        function nextWord() {
+            APP_STATE.currentIndex++;
+            
+            if (APP_STATE.currentIndex >= APP_STATE.words.length) {
+                showCompletion();
+            } else {
+                renderCurrentMode();
+            }
+        }
+
+        function showCompletion() {
+            const earnedXP = APP_STATE.words.length * 10;
+            document.getElementById('earned-xp').textContent = earnedXP;
+            
+            // 更新本輪統計
+            document.getElementById('round-total').textContent = APP_STATE.roundTotal || APP_STATE.words.length;
+            document.getElementById('round-correct').textContent = APP_STATE.roundCorrect;
+            const accuracy = APP_STATE.roundTotal > 0 ? Math.round(APP_STATE.roundCorrect / APP_STATE.roundTotal * 100) : 0;
+            document.getElementById('round-accuracy').textContent = accuracy + '%';
+            
+            document.getElementById('complete-modal').classList.remove('hidden');
+            
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        // 複習錯題
+        function reviewMistakes() {
+            document.getElementById('complete-modal').classList.add('hidden');
+            if (APP_STATE.mistakes.length === 0) {
+                alert('太棒了！沒有錯題需要複習 🎉');
+                continuelearning();
+                return;
+            }
+            APP_STATE.words = [...APP_STATE.mistakes];
+            APP_STATE.mistakes = [];
+            APP_STATE.currentIndex = 0;
+            APP_STATE.roundCorrect = 0;
+            APP_STATE.roundTotal = 0;
+            renderCurrentMode();
+        }
+
+        function continuelearning() {
+            document.getElementById('complete-modal').classList.add('hidden');
+            APP_STATE.currentIndex = 0;
+            APP_STATE.roundCorrect = 0;
+            APP_STATE.roundTotal = 0;
+            APP_STATE.mistakes = [];
+            loadContent();
+        }
+
+        function showFeedback(elementId, isCorrect, title, subtitle) {
+            const el = document.getElementById(elementId);
+            el.classList.remove('hidden');
+            el.className = `mt-6 p-4 rounded-xl text-center ${isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`;
+            el.innerHTML = `<div class="font-bold">${title}</div>${subtitle ? `<div class="text-sm opacity-80">${subtitle}</div>` : ''}`;
+        }
+
+        // ===== 語音播放功能（改善清晰度）=====
+        let japaneseVoice = null;
+        let voicesLoaded = false;
+
+        // 初始化並選擇最佳日文語音
+        function initVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) return;
+            
+            voicesLoaded = true;
+            
+            // 優先選擇順序：Google > Microsoft > Apple > 其他
+            const preferredVoices = [
+                'Google 日本語',
+                'Microsoft Haruka',
+                'Microsoft Ayumi',
+                'Microsoft Ichiro',
+                'Kyoko',            // macOS/iOS
+                'Otoya',            // macOS/iOS
+                'Mizuki',           // AWS Polly style names
+                'Takumi'
+            ];
+            
+            // 嘗試找到最佳語音
+            for (const preferred of preferredVoices) {
+                const found = voices.find(v => v.name.includes(preferred));
+                if (found) {
+                    japaneseVoice = found;
+                    console.log('選擇語音:', found.name);
+                    break;
+                }
+            }
+            
+            // 如果沒找到優先語音，選擇任何日文語音
+            if (!japaneseVoice) {
+                japaneseVoice = voices.find(v => v.lang && v.lang.startsWith('ja')) || voices[0];
+                console.log('使用預設語音:', japaneseVoice?.name);
+            }
+        }
+
+        // 監聽語音列表載入
+        if (window.speechSynthesis) {
+            window.speechSynthesis.onvoiceschanged = initVoices;
+            initVoices(); // 立即嘗試一次
+        }
+
+        // 預熱語音引擎（解決第一個字被截掉的問題）
+        let speechWarmedUp = false;
+        function warmUpSpeech() {
+            if (speechWarmedUp) return;
+            const warmUp = new SpeechSynthesisUtterance('');
+            warmUp.volume = 0;
+            window.speechSynthesis.speak(warmUp);
+            speechWarmedUp = true;
+        }
+
+        function speakWord() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (word) {
+                // 先慢速播放一次，再正常速度播放
+                const speakTarget = word.kana || word.word;
+                speakText(speakTarget, 0.6, () => {
+                    setTimeout(() => speakText(speakTarget, 0.85), 800);
+                });
+            }
+        }
+
+        function speakText(text, rate = 0.75, onEnd = null) {
+            // 先取消之前的播放
+            window.speechSynthesis.cancel();
+            
+            // 預熱引擎
+            warmUpSpeech();
+            
+            // 在單字前加上微小停頓，避免第一個音節被截掉
+            // 使用逗號會產生自然的短暫停頓
+            const textWithPause = `, ${text}`;
+            
+            const utterance = new SpeechSynthesisUtterance(textWithPause);
+            
+            // 使用最佳語音
+            if (japaneseVoice) {
+                utterance.voice = japaneseVoice;
+            }
+            
+            utterance.lang = japaneseVoice?.lang || 'ja-JP';
+            utterance.rate = rate;      // 語速（0.1-10，預設1）
+            utterance.pitch = 1.0;      // 音調（0-2，預設1）
+            utterance.volume = 1.0;     // 音量（0-1）
+            
+            if (onEnd) {
+                utterance.onend = onEnd;
+            }
+            
+            // 使用 setTimeout 確保引擎準備好
+            setTimeout(() => {
+                window.speechSynthesis.speak(utterance);
+            }, 50);
+        }
+
+        // 慢速播放（給用戶手動點擊用）
+        function speakSlow() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (word) {
+                const speakTarget = word.kana || word.word;
+                speakText(speakTarget, 0.5);
+            }
+        }
+
+        // 正常速度播放
+        function speakNormal() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (word) {
+                const speakTarget = word.kana || word.word;
+                speakText(speakTarget, 0.85);
+            }
+        }
+
+        function speakExample() {
+            const word = APP_STATE.words[APP_STATE.currentIndex];
+            if (word?.example) {
+                speakText(word.example, 0.9);
+            }
+        }
+
+        function playSound(type) {
+            try {
+                const sound = document.getElementById(`sound-${type}`);
+                sound.currentTime = 0;
+                sound.volume = 0.3;
+                sound.play().catch(() => {});
+            } catch (e) {}
+        }
+
+        // ===== 統計 =====
+        function openStats() {
+            document.getElementById('stat-streak').textContent = userData.streak;
+            document.getElementById('stat-xp').textContent = userData.xp;
+            document.getElementById('stat-words').textContent = userData.wordsLearned?.length || 0;
+            const accuracy = userData.totalAnswered > 0 
+                ? Math.round(userData.totalCorrect / userData.totalAnswered * 100) 
+                : 0;
+            document.getElementById('stat-accuracy').textContent = accuracy + '%';
+            
+            // 更新已學單字列表
+            updateLearnedWordsList();
+            
+            document.getElementById('stats-modal').classList.remove('hidden');
+        }
+
+        function closeStats() {
+            document.getElementById('stats-modal').classList.add('hidden');
+        }
+
+        // 切換顯示已學單字
+        function toggleLearnedWords() {
+            const list = document.getElementById('learned-words-list');
+            const text = document.getElementById('toggle-words-text');
+            const icon = document.getElementById('toggle-words-icon');
+            
+            if (list.classList.contains('hidden')) {
+                list.classList.remove('hidden');
+                text.textContent = '收合';
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+            } else {
+                list.classList.add('hidden');
+                text.textContent = '展開';
+                icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+            }
+        }
+
+        // 更新已學單字列表
+        function updateLearnedWordsList() {
+            const container = document.getElementById('learned-words-list');
+            const history = userData.learnedHistory || {};
+            
+            if (Object.keys(history).length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm text-center">還沒有學習記錄</p>';
+                return;
+            }
+
+            let html = '';
+            for (const [topic, words] of Object.entries(history)) {
+                if (words.length > 0) {
+                    html += `
+                        <div class="mb-3">
+                            <div class="text-xs text-gray-400 mb-1">${topic} (${words.length})</div>
+                            <div class="flex flex-wrap gap-1">
+                                ${words.map(w => `<span class="text-xs bg-white/10 px-2 py-1 rounded">${w}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            container.innerHTML = html || '<p class="text-gray-500 text-sm text-center">還沒有學習記錄</p>';
+        }
+
+        // 清除學習記錄（但保留 XP 等數據）
+        function clearLearnedHistory() {
+            if (confirm('確定要清除學習記錄嗎？\n清除後可以重新學習所有單字，但 XP 和連續天數會保留。')) {
+                userData.learnedHistory = {};
+                userData.wordsLearned = [];
+                APP_STATE.historyData = [];
+                saveUserData();
+                updateLearnedWordsList();
+                alert('學習記錄已清除！');
+            }
+        }
+
+        // ===== 手機選單 =====
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+            
+            // 同步更新手機版主題列表
+            if (!menu.classList.contains('hidden')) {
+                updateMobileTopics();
+            }
+        }
+
+        function updateMobileTopics() {
+            updateMobileTopicSelect();
+        }
+
+        function updateMobileTopicSelect() {
+            const select = document.getElementById('mobile-topic-select');
+            if (!select) return;
+            
+            const topics = TOPICS[APP_STATE.currentMode] || [];
+            
+            select.innerHTML = topics.map(t => `
+                <option value="${t.value}" ${t.value === APP_STATE.currentTopic ? 'selected' : ''}>${t.label}</option>
+            `).join('');
+        }
+
+        function onMobileTopicChange() {
+            const select = document.getElementById('mobile-topic-select');
+            APP_STATE.currentTopic = select.value;
+            APP_STATE.historyData = [];
+            
+            // 同步桌面版選單
+            const desktopSelect = document.getElementById('topic-select');
+            if (desktopSelect) desktopSelect.value = select.value;
+            
+            toggleMobileMenu();
+            loadContent();
+        }
+
+        // ===== 語音輸入功能 =====
+        let recognition = null;
+        let isListening = false;
+
+        function initSpeechRecognition() {
+            // 檢查瀏覽器是否支援語音辨識
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                console.log('此瀏覽器不支援語音辨識');
+                // 隱藏麥克風按鈕
+                document.querySelectorAll('[id$="-mic-btn"]').forEach(btn => {
+                    btn.style.display = 'none';
+                });
+                return false;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';  // 辨識日文
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = function() {
+                isListening = true;
+                updateMicButtonState(true);
+            };
+
+            recognition.onend = function() {
+                isListening = false;
+                updateMicButtonState(false);
+            };
+
+            recognition.onerror = function(event) {
+                console.error('語音辨識錯誤:', event.error);
+                isListening = false;
+                updateMicButtonState(false);
+                
+                if (event.error === 'no-speech') {
+                    showVoiceError('沒有偵測到聲音，請再試一次');
+                } else if (event.error === 'not-allowed') {
+                    showVoiceError('請允許使用麥克風權限');
+                }
+            };
+
+            return true;
+        }
+
+        function startVoiceInput(targetInputId) {
+            if (!recognition) {
+                if (!initSpeechRecognition()) {
+                    alert('您的瀏覽器不支援語音輸入功能，請使用 Chrome 或 Edge 瀏覽器');
+                    return;
+                }
+            }
+
+            if (isListening) {
+                recognition.stop();
+                return;
+            }
+
+            const targetInput = document.getElementById(targetInputId);
+            
+            // 顯示聆聽狀態
+            if (targetInputId === 'chat-input') {
+                document.getElementById('chat-voice-status').classList.remove('hidden');
+            } else {
+                document.getElementById('voice-status').classList.remove('hidden');
+            }
+
+            recognition.onresult = function(event) {
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                // 即時顯示辨識結果
+                if (interimTranscript) {
+                    targetInput.value = interimTranscript;
+                    targetInput.style.color = '#94a3b8'; // 暫時結果用灰色
+                }
+
+                if (finalTranscript) {
+                    targetInput.value = finalTranscript;
+                    targetInput.style.color = 'white';
+                    
+                    // 隱藏聆聽狀態
+                    document.getElementById('chat-voice-status')?.classList.add('hidden');
+                    document.getElementById('voice-status')?.classList.add('hidden');
+
+                    // 播放成功音效
+                    playSound('correct');
+                }
+            };
+
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error('無法啟動語音辨識:', e);
+            }
+        }
+
+        function updateMicButtonState(listening) {
+            const micBtns = document.querySelectorAll('[id$="-mic-btn"]');
+            micBtns.forEach(btn => {
+                if (listening) {
+                    btn.classList.add('animate-pulse', 'ring-4', 'ring-red-500/50');
+                    btn.innerHTML = '<i class="fa-solid fa-stop text-xl"></i>';
+                } else {
+                    btn.classList.remove('animate-pulse', 'ring-4', 'ring-red-500/50');
+                    btn.innerHTML = '<i class="fa-solid fa-microphone text-xl"></i>';
+                    
+                    // 隱藏所有聆聽狀態
+                    document.getElementById('chat-voice-status')?.classList.add('hidden');
+                    document.getElementById('voice-status')?.classList.add('hidden');
+                }
+            });
+        }
+
+        function showVoiceError(message) {
+            // 簡單的錯誤提示
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg z-50 animate-slide';
+            toast.innerHTML = `<i class="fa-solid fa-exclamation-circle mr-2"></i>${message}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // 初始化語音辨識
+        document.addEventListener('DOMContentLoaded', () => {
+            initSpeechRecognition();
+        });
+
+        // ===== 鍵盤快捷鍵 =====
+        document.addEventListener('keydown', (e) => {
+            // 避免在輸入框中觸發
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            switch(e.key) {
+                case ' ':  // 空白鍵：翻轉閃卡 / 播放發音
+                    e.preventDefault();
+                    if (APP_STATE.currentMode === 'flashcard') {
+                        flipCard();
+                    } else if (APP_STATE.currentMode === 'listening') {
+                        playListeningWord();
+                    } else {
+                        speakNormal();
+                    }
+                    break;
+                case '1': case '2': case '3': case '4':
+                    // 數字鍵：選擇選項
+                    if (APP_STATE.currentMode === 'quiz' || APP_STATE.currentMode === 'listening') {
+                        const idx = parseInt(e.key) - 1;
+                        const options = document.querySelectorAll(
+                            APP_STATE.currentMode === 'quiz' ? '#quiz-options button' : '#listening-options button'
+                        );
+                        if (options[idx]) options[idx].click();
+                    }
+                    break;
+                case 'ArrowRight':
+                case 'Enter':
+                    // 右箭頭/Enter：下一個（閃卡評分「有印象」）
+                    if (APP_STATE.currentMode === 'flashcard' && APP_STATE.isFlipped) {
+                        rateCard('good');
+                    }
+                    break;
+                case 'ArrowLeft':
+                    // 左箭頭：再學一次
+                    if (APP_STATE.currentMode === 'flashcard' && APP_STATE.isFlipped) {
+                        rateCard('hard');
+                    }
+                    break;
+                case 'ArrowUp':
+                    // 上箭頭：很熟悉
+                    if (APP_STATE.currentMode === 'flashcard' && APP_STATE.isFlipped) {
+                        rateCard('easy');
+                    }
+                    break;
+                case 's':
+                    // S：慢速播放
+                    speakSlow();
+                    break;
+                case 'r':
+                    // R：重複播放
+                    speakWord();
+                    break;
+            }
+        });
+
+        function resetAllData() {
+            if (confirm('確定要重置所有學習數據嗎？\n這會清除所有 XP、連續天數和學習記錄！')) {
+                userData = { 
+                    xp: 0, 
+                    streak: 0, 
+                    wordsLearned: [], 
+                    learnedHistory: {},
+                    totalCorrect: 0, 
+                    totalAnswered: 0, 
+                    lastActive: null 
+                };
+                APP_STATE.historyData = [];
+                saveUserData();
+                closeStats();
+                alert('所有數據已重置！');
+            }
+        }
+    </script>
+</body>
+</html>
