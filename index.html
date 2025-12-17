@@ -819,6 +819,9 @@
                                 </span>
                                 <h3 id="grammar-concept" class="text-2xl font-bold mt-3"></h3>
                                 <p id="grammar-explanation" class="text-gray-400 mt-2"></p>
+                                <div id="grammar-examples" class="mt-4 space-y-2 hidden">
+                                    <!-- 例句清單 -->
+                                </div>
                             </div>
 
                             <div id="grammar-quiz" class="space-y-6">
@@ -991,6 +994,7 @@
             currentIndex: 0,
             words: [],
             historyData: [],
+            grammarHistory: [],
             isFlipped: false,
             isAnswered: false,
             totalCorrect: 0,
@@ -1292,6 +1296,13 @@
         }
 
         // ===== 用戶數據 =====
+        function trimArray(arr, limit = 200) {
+            if (!Array.isArray(arr)) return;
+            if (arr.length > limit) {
+                arr.splice(0, arr.length - limit); // 保留最新的 limit 筆
+            }
+        }
+
         function loadUserData() {
             if (!userData.xp) {
                 userData = { 
@@ -1299,6 +1310,7 @@
                     streak: 0, 
                     wordsLearned: [],      // 學過的單字列表
                     learnedHistory: {},    // 按主題分類的學習記錄
+                    learnedGrammar: {},    // 按主題分類的文法概念記錄
                     totalCorrect: 0, 
                     totalAnswered: 0, 
                     lastActive: null 
@@ -1306,6 +1318,7 @@
             }
             // 兼容舊版本
             if (!userData.learnedHistory) userData.learnedHistory = {};
+            if (!userData.learnedGrammar) userData.learnedGrammar = {};
             
             updateUI();
         }
@@ -1320,6 +1333,11 @@
             return userData.learnedHistory[topic] || [];
         }
 
+        // 取得某主題已學過的文法概念
+        function getLearnedGrammarForTopic(topic) {
+            return userData.learnedGrammar[topic] || [];
+        }
+
         // 儲存學過的單字到記錄
         function saveLearnedWord(word, topic) {
             if (!userData.learnedHistory[topic]) {
@@ -1327,9 +1345,24 @@
             }
             if (!userData.learnedHistory[topic].includes(word)) {
                 userData.learnedHistory[topic].push(word);
+                trimArray(userData.learnedHistory[topic], 400);
             }
             if (!userData.wordsLearned.includes(word)) {
                 userData.wordsLearned.push(word);
+                trimArray(userData.wordsLearned, 1000);
+            }
+            saveUserData();
+        }
+
+        // 儲存學過的文法概念到記錄
+        function saveLearnedGrammar(concept, topic) {
+            if (!concept) return;
+            if (!userData.learnedGrammar[topic]) {
+                userData.learnedGrammar[topic] = [];
+            }
+            if (!userData.learnedGrammar[topic].includes(concept)) {
+                userData.learnedGrammar[topic].push(concept);
+                trimArray(userData.learnedGrammar[topic], 200);
             }
             saveUserData();
         }
@@ -1859,23 +1892,33 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                     
                     // 合併持久化的學習記錄 + 當前 session 的記錄
                     const persistentHistory = getLearnedWordsForTopic(APP_STATE.currentTopic);
-                    const allExcluded = [...new Set([...persistentHistory, ...APP_STATE.historyData])];
+                    const persistentGrammar = getLearnedGrammarForTopic(APP_STATE.currentTopic);
+                    const allExcludedWords = [...new Set([...persistentHistory, ...APP_STATE.historyData])];
+                    const allExcludedGrammar = [...new Set([...(APP_STATE.grammarHistory || []), ...persistentGrammar])];
                     
                     const prompt = generatePrompt(
                         type,
                         APP_STATE.currentTopic,
                         document.getElementById('level-select').value,
-                        allExcluded
+                        type === 'grammar' ? allExcludedGrammar : allExcludedWords
                     );
 
                     const data = await callGeminiAPI(prompt);
                     
                     if (data.words) {
                         APP_STATE.words = shuffleArray(data.words);
-                        APP_STATE.words.forEach(w => APP_STATE.historyData.push(w.word));
+                        APP_STATE.words.forEach(w => {
+                            APP_STATE.historyData.push(w.word);
+                            trimArray(APP_STATE.historyData, 400);
+                        });
                         APP_STATE.currentIndex = 0;
                         renderCurrentMode();
                     } else if (data.concept) {
+                        // 記錄文法概念，避免重複
+                        const concept = stripHtml(data.concept);
+                        APP_STATE.grammarHistory.push(concept);
+                        trimArray(APP_STATE.grammarHistory, 400);
+                        saveLearnedGrammar(concept, APP_STATE.currentTopic);
                         renderGrammar(data);
                     }
                 }
@@ -2245,6 +2288,71 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
             `).join('');
         }
 
+        // Enhanced grammar render with shuffle + TTS + examples
+        const renderGrammarOriginal = renderGrammar;
+        renderGrammar = function (data) {
+            const concept = stripHtml(data.concept);
+            const explanation = stripHtml(data.explanation);
+            document.getElementById('grammar-concept').textContent = concept;
+            document.getElementById('grammar-explanation').textContent = explanation;
+
+            // 例句呈現＋語音
+            const examples = Array.isArray(data.example_sentences) ? data.example_sentences : [];
+            const exContainer = document.getElementById('grammar-examples');
+            if (exContainer) {
+                if (examples.length > 0) {
+                    exContainer.innerHTML = examples.map((ex, i) => `
+                        <div class="flex items-start gap-3 bg-white/5 rounded-xl px-3 py-2">
+                            <span class="text-xs bg-blue-500/20 text-blue-200 px-2 py-1 rounded-full mt-0.5">例句 ${i + 1}</span>
+                            <div class="flex-1">
+                                <p class="text-sm text-gray-100 mb-1">${stripHtml(ex)}</p>
+                                <div class="flex items-center gap-2 text-xs text-gray-400">
+                                    <button onclick="speakText('${stripHtml(ex).replace(/'/g, "\\'")}', 0.9)" class="px-2 py-1 rounded-full bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 transition">
+                                        <i class="fa-solid fa-volume-high mr-1"></i>播放
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                    exContainer.classList.remove('hidden');
+                } else {
+                    exContainer.innerHTML = '';
+                    exContainer.classList.add('hidden');
+                }
+            }
+
+            // 題目與選項洗牌
+            const quizItems = shuffleArray(data.quiz || []);
+            document.getElementById('grammar-quiz').innerHTML = quizItems.map((q, idx) => {
+                const optionObjects = (q.options || []).map((opt, i) => ({ opt, i }));
+                const shuffled = shuffleArray(optionObjects);
+                const correctIndex = shuffled.findIndex(o => o.i === q.answer);
+
+                const optionsHtml = shuffled.map((item, i) => `
+                    <button 
+                        onclick="checkGrammarAnswer(this, ${i}, ${correctIndex}, '${stripHtml(q.reason || '').replace(/'/g, "\\'")})"
+                        data-correct="${i === correctIndex}"
+                        class="btn-option w-full py-3 px-4 rounded-lg text-left text-sm">
+                        <span class="font-bold text-blue-300 mr-2">(${i + 1})</span>${stripHtml(item.opt)}
+                    </button>
+                `).join('');
+
+                return `
+                <div class="bg-white/5 rounded-xl p-4">
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                        <p class="font-bold flex-1">Q${idx + 1}. ${stripHtml(q.question)}</p>
+                        <button onclick="speakText('${stripHtml(q.question).replace(/'/g, "\\'")}', 0.95)" class="shrink-0 w-9 h-9 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-200 hover:bg-amber-500/30 transition" title="播放題目">
+                            <i class="fa-solid fa-volume-high text-sm"></i>
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        ${optionsHtml}
+                    </div>
+                    <div class="grammar-feedback hidden mt-3 p-3 rounded-lg text-sm"></div>
+                </div>`;
+            }).join('');
+        };
+
         // ===== 五十音模式 =====
         function renderKana() {
             const container = document.getElementById('kana-grid');
@@ -2361,7 +2469,13 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
         function checkGrammarAnswer(btn, selected, correct, reason) {
             const container = btn.closest('.space-y-2');
             const feedback = btn.closest('.bg-white\\/5').querySelector('.grammar-feedback');
-            
+            if (!container || !feedback) return;
+            if (container.dataset.answered === 'true') return;
+            container.dataset.answered = 'true';
+
+            const buttons = Array.from(container.querySelectorAll('button'));
+            const correctBtn = buttons.find(b => b.dataset.correct === 'true');
+
             if (selected === correct) {
                 btn.classList.add('correct');
                 playSound('correct');
@@ -2369,13 +2483,14 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 feedback.innerHTML = `<span class="text-green-400">✓ ${reason}</span>`;
             } else {
                 btn.classList.add('wrong');
+                if (correctBtn) correctBtn.classList.add('correct');
                 playSound('wrong');
                 feedback.innerHTML = `<span class="text-red-400">✗ ${reason}</span>`;
             }
             feedback.classList.remove('hidden');
 
             // 禁用所有選項
-            container.querySelectorAll('button').forEach(b => b.disabled = true);
+            buttons.forEach(b => b.disabled = true);
         }
 
         // ===== AI 對話模式 =====
