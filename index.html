@@ -2949,6 +2949,9 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
         // ===== 語音輸入功能 =====
         let recognition = null;
         let isListening = false;
+        let recognitionTimeout = null;
+        let currentTargetInput = null;
+        let accumulatedTranscript = '';
 
         function initSpeechRecognition() {
             // 檢查瀏覽器是否支援語音辨識
@@ -2963,51 +2966,115 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 return false;
             }
 
+            // 每次創建新的 recognition 實例，避免狀態問題
             recognition = new SpeechRecognition();
             recognition.lang = 'ja-JP';  // 辨識日文
-            recognition.continuous = false;
-            recognition.interimResults = true;
-            recognition.maxAlternatives = 1;
+            recognition.continuous = true;  // 改為連續模式，更適合對話
+            recognition.interimResults = true;  // 顯示即時結果
+            recognition.maxAlternatives = 3;  // 增加候選結果數量
 
             recognition.onstart = function() {
                 isListening = true;
+                accumulatedTranscript = '';
                 updateMicButtonState(true);
+                
+                // 設置超時（15秒後自動停止，避免一直等待）
+                recognitionTimeout = setTimeout(() => {
+                    if (isListening) {
+                        recognition.stop();
+                        showVoiceError('聆聽超時，請再試一次');
+                    }
+                }, 15000);
             };
 
             recognition.onend = function() {
                 isListening = false;
                 updateMicButtonState(false);
+                if (recognitionTimeout) {
+                    clearTimeout(recognitionTimeout);
+                    recognitionTimeout = null;
+                }
+                
+                // 如果有累積的結果但還沒最終確認，使用最後的結果
+                if (currentTargetInput && accumulatedTranscript && !currentTargetInput.value.trim()) {
+                    currentTargetInput.value = accumulatedTranscript.trim();
+                    currentTargetInput.style.color = 'white';
+                    playSound('correct');
+                }
+                
+                // 隱藏聆聽狀態
+                document.getElementById('chat-voice-status')?.classList.add('hidden');
+                document.getElementById('voice-status')?.classList.add('hidden');
             };
 
             recognition.onerror = function(event) {
                 console.error('語音辨識錯誤:', event.error);
                 isListening = false;
                 updateMicButtonState(false);
+                if (recognitionTimeout) {
+                    clearTimeout(recognitionTimeout);
+                    recognitionTimeout = null;
+                }
+                
+                let errorMessage = '語音辨識發生錯誤';
                 
                 if (event.error === 'no-speech') {
-                    showVoiceError('沒有偵測到聲音，請再試一次');
+                    errorMessage = '沒有偵測到聲音，請靠近麥克風再試一次';
                 } else if (event.error === 'not-allowed') {
-                    showVoiceError('請允許使用麥克風權限');
+                    errorMessage = '請允許使用麥克風權限（檢查瀏覽器設定）';
+                } else if (event.error === 'network') {
+                    errorMessage = '網路連線問題，請檢查網路後再試';
+                } else if (event.error === 'service-not-allowed') {
+                    errorMessage = '語音服務不可用，請稍後再試';
+                } else if (event.error === 'aborted') {
+                    // 用戶主動停止，不顯示錯誤
+                    return;
+                } else if (event.error === 'audio-capture') {
+                    errorMessage = '無法取得麥克風音訊，請檢查麥克風設定';
                 }
+                
+                showVoiceError(errorMessage);
+                
+                // 隱藏聆聽狀態
+                document.getElementById('chat-voice-status')?.classList.add('hidden');
+                document.getElementById('voice-status')?.classList.add('hidden');
+            };
+
+            recognition.onnomatch = function() {
+                // 沒有匹配結果，但繼續聆聽
+                console.log('沒有匹配的語音結果，繼續聆聽...');
             };
 
             return true;
         }
 
         function startVoiceInput(targetInputId) {
+            // 如果正在聆聽，先停止
+            if (isListening && recognition) {
+                recognition.stop();
+                // 等待停止完成後再重新開始
+                setTimeout(() => startVoiceInput(targetInputId), 300);
+                return;
+            }
+
             if (!recognition) {
                 if (!initSpeechRecognition()) {
                     alert('您的瀏覽器不支援語音輸入功能，請使用 Chrome 或 Edge 瀏覽器');
                     return;
                 }
+            } else {
+                // 重新初始化以確保乾淨的狀態
+                initSpeechRecognition();
             }
 
-            if (isListening) {
-                recognition.stop();
+            currentTargetInput = document.getElementById(targetInputId);
+            if (!currentTargetInput) {
+                console.error('找不到目標輸入框:', targetInputId);
                 return;
             }
-
-            const targetInput = document.getElementById(targetInputId);
+            
+            // 清空之前的結果
+            accumulatedTranscript = '';
             
             // 顯示聆聽狀態
             if (targetInputId === 'chat-input') {
@@ -3020,29 +3087,39 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 let finalTranscript = '';
                 let interimTranscript = '';
 
+                // 處理所有結果
                 for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
+                    const result = event.results[i];
+                    const transcript = result[0].transcript;
+                    const confidence = result[0].confidence || 0.5;
+                    
+                    if (result.isFinal) {
+                        // 只接受信心度較高的最終結果
+                        if (confidence > 0.3) {
+                            finalTranscript += transcript;
+                            accumulatedTranscript = finalTranscript;
+                        }
                     } else {
-                        interimTranscript += transcript;
+                        // 即時結果
+                        interimTranscript = transcript;
                     }
                 }
 
                 // 即時顯示辨識結果
                 if (interimTranscript) {
-                    targetInput.value = interimTranscript;
-                    targetInput.style.color = '#94a3b8'; // 暫時結果用灰色
+                    const displayText = accumulatedTranscript ? 
+                        accumulatedTranscript + ' ' + interimTranscript : 
+                        interimTranscript;
+                    currentTargetInput.value = displayText;
+                    currentTargetInput.style.color = '#94a3b8'; // 暫時結果用灰色
                 }
 
+                // 處理最終結果
                 if (finalTranscript) {
-                    targetInput.value = finalTranscript;
-                    targetInput.style.color = 'white';
+                    accumulatedTranscript = finalTranscript.trim();
+                    currentTargetInput.value = accumulatedTranscript;
+                    currentTargetInput.style.color = 'white';
                     
-                    // 隱藏聆聽狀態
-                    document.getElementById('chat-voice-status')?.classList.add('hidden');
-                    document.getElementById('voice-status')?.classList.add('hidden');
-
                     // 播放成功音效
                     playSound('correct');
                 }
@@ -3052,6 +3129,19 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 recognition.start();
             } catch (e) {
                 console.error('無法啟動語音辨識:', e);
+                if (e.message && e.message.includes('already started')) {
+                    // 如果已經在運行，先停止再重新開始
+                    recognition.stop();
+                    setTimeout(() => {
+                        try {
+                            recognition.start();
+                        } catch (e2) {
+                            showVoiceError('無法啟動語音辨識，請稍後再試');
+                        }
+                    }, 500);
+                } else {
+                    showVoiceError('無法啟動語音辨識，請檢查麥克風權限');
+                }
             }
         }
 
