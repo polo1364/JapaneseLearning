@@ -862,7 +862,7 @@
                                     </button>
                                     <input type="text" id="chat-input" 
                                         class="flex-1 bg-white/10 border border-white/20 rounded-full px-5 py-3 focus:border-rose-500 focus:outline-none transition text-base"
-                                        placeholder="說日文或打字..."
+                                        placeholder="說日文或中文，AI 會教你..."
                                         onkeypress="if(event.key==='Enter') sendChat()">
                                     <button onclick="sendChat()" class="w-12 h-12 bg-gradient-to-r from-rose-500 to-purple-500 rounded-full flex items-center justify-center hover:opacity-90 hover:scale-105 transition shrink-0" title="發送">
                                         <i class="fa-solid fa-paper-plane"></i>
@@ -870,7 +870,7 @@
                                 </div>
                                 <p class="text-xs text-gray-500 mt-2 text-center">
                                     <i class="fa-solid fa-microphone text-red-400 mr-1"></i>點麥克風用說的 · 
-                                    <i class="fa-solid fa-keyboard text-blue-400 mr-1"></i>或直接打字
+                                    <i class="fa-solid fa-keyboard text-blue-400 mr-1"></i>或直接打字（日文/中文皆可）
                                 </p>
                                 <!-- 語音辨識狀態 -->
                                 <div id="chat-voice-status" class="hidden mt-2 text-center">
@@ -1475,6 +1475,12 @@
 
         // ===== 模式切換 =====
         function switchMode(mode) {
+            // 停止語音識別的自動重啟
+            autoRestartChat = false;
+            if (isListening && recognition) {
+                recognition.stop();
+            }
+            
             APP_STATE.currentMode = mode;
             APP_STATE.historyData = [];
             APP_STATE.currentIndex = 0;
@@ -1793,7 +1799,40 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
 }`;
 
                 case 'chat':
-                    return `You are an AI Japanese conversation partner in a language learning app.
+                    // 檢測用戶輸入是否為中文（簡單判斷：包含中文字符）
+                    const isChinese = /[\u4e00-\u9fa5]/.test(userMessage);
+                    
+                    if (isChinese) {
+                        // 用戶輸入中文，提供日文教學
+                        return `You are an AI Japanese teacher helping a Traditional Chinese speaker learn Japanese.
+
+**Scenario:** ${topic}
+**User's Level:** ${level} (${levelDesc})
+**User said in Chinese:** "${userMessage}"
+
+**Your Task:**
+1. Translate the user's Chinese message into natural Japanese appropriate for ${level} level.
+2. Provide pronunciation guidance (romaji and pronunciation tips).
+3. Explain the grammar and vocabulary used.
+4. Provide a natural Japanese response to continue the conversation.
+5. Encourage the user to practice saying the Japanese translation.
+
+**Output Format (JSON only, no markdown):**
+{
+    "isChinese": true,
+    "japanese": "日文翻譯（自然的日文表達）",
+    "kana": "假名標註（如有漢字）",
+    "romaji": "羅馬拼音",
+    "pronunciation": "發音提示（用繁體中文說明發音重點）",
+    "grammar": "文法說明（用繁體中文解釋使用的文法）",
+    "vocabulary": "單字解釋（用繁體中文說明重要單字）",
+    "reply": "你的日文回覆（繼續對話，2-3 sentences）",
+    "chinese": "回覆的繁體中文翻譯",
+    "encouragement": "鼓勵用戶練習說這句話（用繁體中文）"
+}`;
+                    } else {
+                        // 用戶輸入日文，正常對話
+                        return `You are an AI Japanese conversation partner in a language learning app.
 
 **Scenario:** ${topic}
 **User's Level:** ${level} (${levelDesc})
@@ -1802,16 +1841,35 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
 **Your Task:**
 1. Reply naturally in Japanese as the other person in this scenario.
 2. Keep the language appropriate for ${level} level.
-3. Provide helpful feedback on the user's Japanese.
-4. Give a score (0-100) based on grammar, vocabulary, and naturalness.
+3. Analyze the user's Japanese carefully and provide detailed feedback.
+4. Give an ACCURATE score (0-100) based on:
+   - **Grammar accuracy** (30 points): Correct use of particles, verb forms, sentence structure
+   - **Vocabulary appropriateness** (30 points): Suitable word choice for the level and context
+   - **Naturalness** (25 points): Does it sound like native Japanese? Proper politeness level?
+   - **Completeness** (15 points): Does it fully express the intended meaning?
+
+**Scoring Guidelines:**
+- 90-100: Excellent - Native-like, perfect grammar, natural expressions
+- 80-89: Very Good - Minor errors, mostly natural, appropriate for level
+- 70-79: Good - Some errors but understandable, needs improvement
+- 60-69: Fair - Multiple errors, awkward phrasing, but meaning is clear
+- 50-59: Poor - Many errors, hard to understand, needs significant work
+- 0-49: Very Poor - Major errors, incomprehensible, or completely wrong
+
+**IMPORTANT:** Score must reflect the ACTUAL quality of the user's Japanese. Do NOT give the same score every time. Vary scores based on real performance. If the user makes mistakes, give lower scores. If they write perfectly, give high scores.
 
 **Output Format (JSON only, no markdown):**
 {
+    "isChinese": false,
     "reply": "你的日文回覆 (2-3 sentences, keep natural)",
     "chinese": "回覆的繁體中文翻譯",
-    "score": 85,
-    "feedback": "對用戶日文的具體建議（用繁體中文）"
+    "score": 75,
+    "feedback": "對用戶日文的具體建議（用繁體中文），指出優點和需要改進的地方，要具體說明哪裡有錯誤或可以更好的地方"
+}
+
+**CRITICAL:** The "score" value above is just an example. You MUST evaluate each user message individually and assign a score that accurately reflects their actual performance. Different messages should receive different scores based on their quality. Never use the same score repeatedly.
 }`;
+                    }
 
                 default:
                     return `Generate a simple greeting in JSON format: {"message": "Hello!"}`;
@@ -2537,7 +2595,7 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                             </button>
                         </div>
                         <p class="text-sm text-gray-400 mt-2 border-t border-white/10 pt-2">${chatInfo.chinese}</p>
-                        <p class="text-xs text-blue-400 mt-2"><i class="fa-solid fa-lightbulb mr-1"></i>提示：用日文回覆，練習對話！</p>
+                        <p class="text-xs text-blue-400 mt-2"><i class="fa-solid fa-lightbulb mr-1"></i>提示：可以用日文或中文輸入！說中文時，AI 會教你如何用日文表達</p>
                     </div>
                 </div>
             `;
@@ -2591,40 +2649,112 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 const data = await callGeminiAPI(prompt);
                 document.getElementById(loadingId).remove();
 
-                // AI 回覆 - 轉義引號避免 HTML 問題
-                const safeReply = data.reply.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                
-                messagesContainer.innerHTML += `
-                    <div class="flex gap-3 animate-slide">
-                        <div class="w-10 h-10 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
-                            <i class="fa-solid fa-robot"></i>
-                        </div>
-                        <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[80%]">
-                            <div class="flex items-start justify-between gap-2">
-                                <p class="flex-1">${data.reply}</p>
-                                <div class="shrink-0 flex gap-1">
-                                    <button onclick="speakChatMessage(this, 0.6)" data-text="${safeReply}" 
-                                        class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速播放">
-                                        <i class="fa-solid fa-volume-low text-xs"></i>
-                                    </button>
-                                    <button onclick="speakChatMessage(this, 0.85)" data-text="${safeReply}" 
-                                        class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常播放">
-                                        <i class="fa-solid fa-volume-high text-sm"></i>
-                                    </button>
-                                </div>
+                // 處理中文輸入的情況（日文教學）
+                if (data.isChinese) {
+                    const safeJapanese = (data.japanese || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const safeKana = (data.kana || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const safeRomaji = (data.romaji || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const safeReply = (data.reply || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    
+                    messagesContainer.innerHTML += `
+                        <div class="flex gap-3 animate-slide">
+                            <div class="w-10 h-10 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
+                                <i class="fa-solid fa-robot"></i>
                             </div>
-                            <p class="text-xs text-gray-500 mt-2">${data.chinese}</p>
-                            ${data.feedback ? `<p class="text-xs text-yellow-400 mt-2 border-t border-white/10 pt-2">💡 ${data.feedback}</p>` : ''}
-                            ${data.score ? `<div class="mt-2 flex items-center gap-2">
-                                <span class="text-xs text-gray-400">表達評分</span>
-                                <div class="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                                    <div class="h-full ${data.score >= 80 ? 'bg-green-500' : data.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}" style="width: ${data.score}%"></div>
+                            <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[80%]">
+                                <!-- 日文翻譯教學 -->
+                                <div class="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-4 mb-3">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <i class="fa-solid fa-language text-purple-400"></i>
+                                        <span class="text-sm font-bold text-purple-300">日文翻譯</span>
+                                    </div>
+                                    <div class="flex items-start justify-between gap-2 mb-2">
+                                        <div class="flex-1">
+                                            <p class="text-lg font-semibold mb-1">${data.japanese}</p>
+                                            ${data.kana ? `<p class="text-sm text-gray-400 mb-1">${data.kana}</p>` : ''}
+                                            ${data.romaji ? `<p class="text-sm text-blue-300 font-mono">${data.romaji}</p>` : ''}
+                                        </div>
+                                        <div class="shrink-0 flex gap-1">
+                                            <button onclick="speakChatMessage(this, 0.6)" data-text="${safeJapanese}" 
+                                                class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速播放">
+                                                <i class="fa-solid fa-volume-low text-xs"></i>
+                                            </button>
+                                            <button onclick="speakChatMessage(this, 0.85)" data-text="${safeJapanese}" 
+                                                class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常播放">
+                                                <i class="fa-solid fa-volume-high text-sm"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    ${data.pronunciation ? `<p class="text-xs text-yellow-300 mt-2"><i class="fa-solid fa-microphone mr-1"></i>發音提示：${data.pronunciation}</p>` : ''}
                                 </div>
-                                <span class="text-xs font-bold">${data.score}</span>
-                            </div>` : ''}
+                                
+                                <!-- 文法與單字說明 -->
+                                ${data.grammar || data.vocabulary ? `
+                                <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-3">
+                                    ${data.grammar ? `<p class="text-xs text-blue-300 mb-1"><i class="fa-solid fa-book mr-1"></i><strong>文法：</strong>${data.grammar}</p>` : ''}
+                                    ${data.vocabulary ? `<p class="text-xs text-blue-300"><i class="fa-solid fa-list mr-1"></i><strong>單字：</strong>${data.vocabulary}</p>` : ''}
+                                </div>
+                                ` : ''}
+                                
+                                <!-- AI 回覆 -->
+                                <div class="border-t border-white/10 pt-3">
+                                    <div class="flex items-start justify-between gap-2 mb-2">
+                                        <p class="flex-1">${data.reply}</p>
+                                        <div class="shrink-0 flex gap-1">
+                                            <button onclick="speakChatMessage(this, 0.6)" data-text="${safeReply}" 
+                                                class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速播放">
+                                                <i class="fa-solid fa-volume-low text-xs"></i>
+                                            </button>
+                                            <button onclick="speakChatMessage(this, 0.85)" data-text="${safeReply}" 
+                                                class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常播放">
+                                                <i class="fa-solid fa-volume-high text-sm"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-gray-500">${data.chinese}</p>
+                                </div>
+                                
+                                <!-- 鼓勵練習 -->
+                                ${data.encouragement ? `<p class="text-xs text-green-300 mt-3 border-t border-white/10 pt-3"><i class="fa-solid fa-heart mr-1"></i>${data.encouragement}</p>` : ''}
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    // 正常日文對話
+                    const safeReply = (data.reply || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    
+                    messagesContainer.innerHTML += `
+                        <div class="flex gap-3 animate-slide">
+                            <div class="w-10 h-10 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
+                                <i class="fa-solid fa-robot"></i>
+                            </div>
+                            <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[80%]">
+                                <div class="flex items-start justify-between gap-2">
+                                    <p class="flex-1">${data.reply}</p>
+                                    <div class="shrink-0 flex gap-1">
+                                        <button onclick="speakChatMessage(this, 0.6)" data-text="${safeReply}" 
+                                            class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速播放">
+                                            <i class="fa-solid fa-volume-low text-xs"></i>
+                                        </button>
+                                        <button onclick="speakChatMessage(this, 0.85)" data-text="${safeReply}" 
+                                            class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常播放">
+                                            <i class="fa-solid fa-volume-high text-sm"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">${data.chinese}</p>
+                                ${data.feedback ? `<p class="text-xs text-yellow-400 mt-2 border-t border-white/10 pt-2">💡 ${data.feedback}</p>` : ''}
+                                ${data.score ? `<div class="mt-2 flex items-center gap-2">
+                                    <span class="text-xs text-gray-400">表達評分</span>
+                                    <div class="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                                        <div class="h-full ${data.score >= 80 ? 'bg-green-500' : data.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}" style="width: ${data.score}%"></div>
+                                    </div>
+                                    <span class="text-xs font-bold">${data.score}</span>
+                                </div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
 
                 addXP(5);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -2952,6 +3082,7 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
         let recognitionTimeout = null;
         let currentTargetInput = null;
         let accumulatedTranscript = '';
+        let autoRestartChat = false;  // 標記是否應該自動重新開始聊天聆聽
 
         function initSpeechRecognition() {
             // 檢查瀏覽器是否支援語音辨識
@@ -2969,7 +3100,8 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
             // 每次創建新的 recognition 實例，避免狀態問題
             recognition = new SpeechRecognition();
             recognition.lang = 'ja-JP';  // 辨識日文
-            recognition.continuous = true;  // 改為連續模式，更適合對話
+            // 聊天模式使用連續模式，其他模式使用非連續模式
+            recognition.continuous = (currentTargetInput && currentTargetInput.id === 'chat-input');
             recognition.interimResults = true;  // 顯示即時結果
             recognition.maxAlternatives = 3;  // 增加候選結果數量
 
@@ -3000,11 +3132,34 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                     currentTargetInput.value = accumulatedTranscript.trim();
                     currentTargetInput.style.color = 'white';
                     playSound('correct');
+                    
+                    // 如果是聊天模式且有內容，自動發送
+                    if (currentTargetInput.id === 'chat-input' && accumulatedTranscript.trim()) {
+                        setTimeout(() => {
+                            sendChat();
+                            // 發送後自動重新開始聆聽
+                            setTimeout(() => {
+                                if (APP_STATE.currentMode === 'chat' && autoRestartChat) {
+                                    startVoiceInput('chat-input');
+                                }
+                            }, 500);
+                        }, 300);
+                        return;  // 不繼續執行後面的自動重啟邏輯
+                    }
                 }
                 
                 // 隱藏聆聽狀態
                 document.getElementById('chat-voice-status')?.classList.add('hidden');
                 document.getElementById('voice-status')?.classList.add('hidden');
+                
+                // 如果是聊天模式且應該自動重啟，則重新開始聆聽
+                if (autoRestartChat && currentTargetInput && currentTargetInput.id === 'chat-input' && APP_STATE.currentMode === 'chat') {
+                    setTimeout(() => {
+                        if (!isListening && APP_STATE.currentMode === 'chat') {
+                            startVoiceInput('chat-input');
+                        }
+                    }, 500);
+                }
             };
 
             recognition.onerror = function(event) {
@@ -3051,6 +3206,7 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
         function startVoiceInput(targetInputId) {
             // 如果正在聆聽，先停止
             if (isListening && recognition) {
+                autoRestartChat = false;  // 手動停止時取消自動重啟
                 recognition.stop();
                 // 等待停止完成後再重新開始
                 setTimeout(() => startVoiceInput(targetInputId), 300);
@@ -3076,6 +3232,9 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
             // 清空之前的結果
             accumulatedTranscript = '';
             
+            // 設置自動重啟標記（僅聊天模式）
+            autoRestartChat = (targetInputId === 'chat-input');
+            
             // 顯示聆聽狀態
             if (targetInputId === 'chat-input') {
                 document.getElementById('chat-voice-status').classList.remove('hidden');
@@ -3097,7 +3256,7 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                         // 只接受信心度較高的最終結果
                         if (confidence > 0.3) {
                             finalTranscript += transcript;
-                            accumulatedTranscript = finalTranscript;
+                            accumulatedTranscript += (accumulatedTranscript ? ' ' : '') + transcript;
                         }
                     } else {
                         // 即時結果
@@ -3116,12 +3275,28 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
 
                 // 處理最終結果
                 if (finalTranscript) {
-                    accumulatedTranscript = finalTranscript.trim();
+                    accumulatedTranscript = accumulatedTranscript.trim();
                     currentTargetInput.value = accumulatedTranscript;
                     currentTargetInput.style.color = 'white';
                     
                     // 播放成功音效
                     playSound('correct');
+                    
+                    // 如果是聊天模式，自動發送並繼續聆聽
+                    if (targetInputId === 'chat-input' && accumulatedTranscript) {
+                        // 設置自動重啟標記
+                        autoRestartChat = true;
+                        
+                        // 停止當前識別
+                        recognition.stop();
+                        
+                        // 短暫延遲後自動發送
+                        setTimeout(() => {
+                            if (currentTargetInput && currentTargetInput.value.trim()) {
+                                sendChat();
+                            }
+                        }, 300);
+                    }
                 }
             };
 
