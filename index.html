@@ -1799,25 +1799,50 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
 }`;
 
                 case 'chat':
-                    // 檢測用戶輸入是否為中文（簡單判斷：包含中文字符）
-                    const isChinese = /[\u4e00-\u9fa5]/.test(userMessage);
-                    
-                    if (isChinese) {
-                        // 用戶輸入中文，提供日文教學
-                        return `You are an AI Japanese teacher helping a Traditional Chinese speaker learn Japanese.
+                    // 讓 AI 自動判斷語言
+                    return `You are an AI Japanese conversation partner and teacher in a language learning app.
 
 **Scenario:** ${topic}
 **User's Level:** ${level} (${levelDesc})
-**User said in Chinese:** "${userMessage}"
+**User said:** "${userMessage}"
 
-**Your Task:**
-1. Translate the user's Chinese message into natural Japanese appropriate for ${level} level.
+**IMPORTANT - Language Detection:**
+First, determine what language the user is speaking:
+- If the user wrote in **Traditional Chinese** (繁體中文), set "isChinese": true
+- If the user wrote in **Japanese** (日本語), set "isChinese": false
+- If the user wrote in **English** or other languages, treat it as if they want to learn Japanese and set "isChinese": true (provide Japanese translation)
+- If the message is mixed (e.g., Chinese + Japanese), determine the PRIMARY language based on the majority of content
+
+**Your Task (if isChinese = true):**
+1. Translate the user's message into natural Japanese appropriate for ${level} level.
 2. Provide pronunciation guidance (romaji and pronunciation tips).
 3. Explain the grammar and vocabulary used.
 4. Provide a natural Japanese response to continue the conversation.
 5. Encourage the user to practice saying the Japanese translation.
 
+**Your Task (if isChinese = false):**
+1. Reply naturally in Japanese as the other person in this scenario.
+2. Keep the language appropriate for ${level} level.
+3. Analyze the user's Japanese carefully and provide detailed feedback.
+4. Give an ACCURATE score (0-100) based on:
+   - **Grammar accuracy** (30 points): Correct use of particles, verb forms, sentence structure
+   - **Vocabulary appropriateness** (30 points): Suitable word choice for the level and context
+   - **Naturalness** (25 points): Does it sound like native Japanese? Proper politeness level?
+   - **Completeness** (15 points): Does it fully express the intended meaning?
+
+**Scoring Guidelines (only when isChinese = false):**
+- 90-100: Excellent - Native-like, perfect grammar, natural expressions
+- 80-89: Very Good - Minor errors, mostly natural, appropriate for level
+- 70-79: Good - Some errors but understandable, needs improvement
+- 60-69: Fair - Multiple errors, awkward phrasing, but meaning is clear
+- 50-59: Poor - Many errors, hard to understand, needs significant work
+- 0-49: Very Poor - Major errors, incomprehensible, or completely wrong
+
+**IMPORTANT:** Score must reflect the ACTUAL quality of the user's Japanese. Do NOT give the same score every time. Vary scores based on real performance.
+
 **Output Format (JSON only, no markdown):**
+
+If isChinese = true:
 {
     "isChinese": true,
     "japanese": "日文翻譯（自然的日文表達）",
@@ -1829,47 +1854,21 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
     "reply": "你的日文回覆（繼續對話，2-3 sentences）",
     "chinese": "回覆的繁體中文翻譯",
     "encouragement": "鼓勵用戶練習說這句話（用繁體中文）"
-}`;
-                    } else {
-                        // 用戶輸入日文，正常對話
-                        return `You are an AI Japanese conversation partner in a language learning app.
+}
 
-**Scenario:** ${topic}
-**User's Level:** ${level} (${levelDesc})
-**User said:** "${userMessage}"
-
-**Your Task:**
-1. Reply naturally in Japanese as the other person in this scenario.
-2. Keep the language appropriate for ${level} level.
-3. Analyze the user's Japanese carefully and provide detailed feedback.
-4. Give an ACCURATE score (0-100) based on:
-   - **Grammar accuracy** (30 points): Correct use of particles, verb forms, sentence structure
-   - **Vocabulary appropriateness** (30 points): Suitable word choice for the level and context
-   - **Naturalness** (25 points): Does it sound like native Japanese? Proper politeness level?
-   - **Completeness** (15 points): Does it fully express the intended meaning?
-
-**Scoring Guidelines:**
-- 90-100: Excellent - Native-like, perfect grammar, natural expressions
-- 80-89: Very Good - Minor errors, mostly natural, appropriate for level
-- 70-79: Good - Some errors but understandable, needs improvement
-- 60-69: Fair - Multiple errors, awkward phrasing, but meaning is clear
-- 50-59: Poor - Many errors, hard to understand, needs significant work
-- 0-49: Very Poor - Major errors, incomprehensible, or completely wrong
-
-**IMPORTANT:** Score must reflect the ACTUAL quality of the user's Japanese. Do NOT give the same score every time. Vary scores based on real performance. If the user makes mistakes, give lower scores. If they write perfectly, give high scores.
-
-**Output Format (JSON only, no markdown):**
+If isChinese = false:
 {
     "isChinese": false,
     "reply": "你的日文回覆 (2-3 sentences, keep natural)",
     "chinese": "回覆的繁體中文翻譯",
-    "score": 75,
+    "score": [VARY THIS - evaluate each message individually, 0-100],
     "feedback": "對用戶日文的具體建議（用繁體中文），指出優點和需要改進的地方，要具體說明哪裡有錯誤或可以更好的地方"
 }
 
-**CRITICAL:** The "score" value above is just an example. You MUST evaluate each user message individually and assign a score that accurately reflects their actual performance. Different messages should receive different scores based on their quality. Never use the same score repeatedly.
+**CRITICAL:** 
+- You MUST accurately detect the language. Check if the message is primarily Chinese characters (繁體中文) or Japanese characters (ひらがな、カタカナ、漢字).
+- For scores, evaluate each message individually. Never use the same score repeatedly.
 }`;
-                    }
 
                 default:
                     return `Generate a simple greeting in JSON format: {"message": "Hello!"}`;
@@ -3084,7 +3083,7 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
         let accumulatedTranscript = '';
         let autoRestartChat = false;  // 標記是否應該自動重新開始聊天聆聽
 
-        function initSpeechRecognition() {
+        function initSpeechRecognition(targetInputId) {
             // 檢查瀏覽器是否支援語音辨識
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
@@ -3097,11 +3096,25 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 return false;
             }
 
-            // 每次創建新的 recognition 實例，避免狀態問題
+            // 如果已經有 recognition 實例且正在運行，先停止並清理
+            if (recognition && isListening) {
+                try {
+                    recognition.stop();
+                } catch (e) {
+                    console.log('停止舊的 recognition:', e);
+                }
+                // 等待停止完成
+                setTimeout(() => {
+                    initSpeechRecognition(targetInputId);
+                }, 300);
+                return true;
+            }
+
+            // 每次創建新的 recognition 實例，確保乾淨的狀態
             recognition = new SpeechRecognition();
             recognition.lang = 'ja-JP';  // 辨識日文
             // 聊天模式使用連續模式，其他模式使用非連續模式
-            recognition.continuous = (currentTargetInput && currentTargetInput.id === 'chat-input');
+            recognition.continuous = (targetInputId === 'chat-input');
             recognition.interimResults = true;  // 顯示即時結果
             recognition.maxAlternatives = 3;  // 增加候選結果數量
 
@@ -3111,8 +3124,11 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 updateMicButtonState(true);
                 
                 // 設置超時（15秒後自動停止，避免一直等待）
+                if (recognitionTimeout) {
+                    clearTimeout(recognitionTimeout);
+                }
                 recognitionTimeout = setTimeout(() => {
-                    if (isListening) {
+                    if (isListening && recognition) {
                         recognition.stop();
                         showVoiceError('聆聽超時，請再試一次');
                     }
@@ -3134,15 +3150,15 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                     playSound('correct');
                     
                     // 如果是聊天模式且有內容，自動發送
-                    if (currentTargetInput.id === 'chat-input' && accumulatedTranscript.trim()) {
+                    if (currentTargetInput && currentTargetInput.id === 'chat-input' && accumulatedTranscript.trim()) {
                         setTimeout(() => {
                             sendChat();
                             // 發送後自動重新開始聆聽
                             setTimeout(() => {
-                                if (APP_STATE.currentMode === 'chat' && autoRestartChat) {
+                                if (APP_STATE.currentMode === 'chat' && autoRestartChat && !isListening) {
                                     startVoiceInput('chat-input');
                                 }
-                            }, 500);
+                            }, 800);
                         }, 300);
                         return;  // 不繼續執行後面的自動重啟邏輯
                     }
@@ -3153,12 +3169,12 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 document.getElementById('voice-status')?.classList.add('hidden');
                 
                 // 如果是聊天模式且應該自動重啟，則重新開始聆聽
-                if (autoRestartChat && currentTargetInput && currentTargetInput.id === 'chat-input' && APP_STATE.currentMode === 'chat') {
+                if (autoRestartChat && currentTargetInput && currentTargetInput.id === 'chat-input' && APP_STATE.currentMode === 'chat' && !isListening) {
                     setTimeout(() => {
-                        if (!isListening && APP_STATE.currentMode === 'chat') {
+                        if (APP_STATE.currentMode === 'chat' && autoRestartChat && !isListening) {
                             startVoiceInput('chat-input');
                         }
-                    }, 500);
+                    }, 800);
                 }
             };
 
@@ -3200,48 +3216,7 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 console.log('沒有匹配的語音結果，繼續聆聽...');
             };
 
-            return true;
-        }
-
-        function startVoiceInput(targetInputId) {
-            // 如果正在聆聽，先停止
-            if (isListening && recognition) {
-                autoRestartChat = false;  // 手動停止時取消自動重啟
-                recognition.stop();
-                // 等待停止完成後再重新開始
-                setTimeout(() => startVoiceInput(targetInputId), 300);
-                return;
-            }
-
-            if (!recognition) {
-                if (!initSpeechRecognition()) {
-                    alert('您的瀏覽器不支援語音輸入功能，請使用 Chrome 或 Edge 瀏覽器');
-                    return;
-                }
-            } else {
-                // 重新初始化以確保乾淨的狀態
-                initSpeechRecognition();
-            }
-
-            currentTargetInput = document.getElementById(targetInputId);
-            if (!currentTargetInput) {
-                console.error('找不到目標輸入框:', targetInputId);
-                return;
-            }
-            
-            // 清空之前的結果
-            accumulatedTranscript = '';
-            
-            // 設置自動重啟標記（僅聊天模式）
-            autoRestartChat = (targetInputId === 'chat-input');
-            
-            // 顯示聆聽狀態
-            if (targetInputId === 'chat-input') {
-                document.getElementById('chat-voice-status').classList.remove('hidden');
-            } else {
-                document.getElementById('voice-status').classList.remove('hidden');
-            }
-
+            // 設置 onresult 處理器
             recognition.onresult = function(event) {
                 let finalTranscript = '';
                 let interimTranscript = '';
@@ -3265,7 +3240,7 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 }
 
                 // 即時顯示辨識結果
-                if (interimTranscript) {
+                if (interimTranscript && currentTargetInput) {
                     const displayText = accumulatedTranscript ? 
                         accumulatedTranscript + ' ' + interimTranscript : 
                         interimTranscript;
@@ -3274,7 +3249,7 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 }
 
                 // 處理最終結果
-                if (finalTranscript) {
+                if (finalTranscript && currentTargetInput) {
                     accumulatedTranscript = accumulatedTranscript.trim();
                     currentTargetInput.value = accumulatedTranscript;
                     currentTargetInput.style.color = 'white';
@@ -3300,16 +3275,64 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
                 }
             };
 
+            return true;
+        }
+
+        function startVoiceInput(targetInputId) {
+            // 如果正在聆聽，先停止
+            if (isListening && recognition) {
+                autoRestartChat = false;  // 手動停止時取消自動重啟
+                try {
+                    recognition.stop();
+                } catch (e) {
+                    console.log('停止 recognition 時出錯:', e);
+                }
+                // 等待停止完成後再重新開始
+                setTimeout(() => startVoiceInput(targetInputId), 500);
+                return;
+            }
+
+            currentTargetInput = document.getElementById(targetInputId);
+            if (!currentTargetInput) {
+                console.error('找不到目標輸入框:', targetInputId);
+                return;
+            }
+            
+            // 清空之前的結果
+            accumulatedTranscript = '';
+            
+            // 設置自動重啟標記（僅聊天模式）
+            autoRestartChat = (targetInputId === 'chat-input');
+            
+            // 初始化或重新初始化語音識別
+            if (!initSpeechRecognition(targetInputId)) {
+                alert('您的瀏覽器不支援語音輸入功能，請使用 Chrome 或 Edge 瀏覽器');
+                return;
+            }
+            
+            // 顯示聆聽狀態
+            if (targetInputId === 'chat-input') {
+                document.getElementById('chat-voice-status')?.classList.remove('hidden');
+            } else {
+                document.getElementById('voice-status')?.classList.remove('hidden');
+            }
+
             try {
                 recognition.start();
             } catch (e) {
                 console.error('無法啟動語音辨識:', e);
                 if (e.message && e.message.includes('already started')) {
                     // 如果已經在運行，先停止再重新開始
-                    recognition.stop();
+                    try {
+                        recognition.stop();
+                    } catch (e1) {
+                        console.log('停止時出錯:', e1);
+                    }
                     setTimeout(() => {
                         try {
-                            recognition.start();
+                            if (recognition && !isListening) {
+                                recognition.start();
+                            }
                         } catch (e2) {
                             showVoiceError('無法啟動語音辨識，請稍後再試');
                         }
