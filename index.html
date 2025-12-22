@@ -216,6 +216,70 @@
             50% { opacity: 0.7; }
         }
 
+        /* ===== 語音優化樣式 ===== */
+        .volume-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            height: 24px;
+            margin-left: 8px;
+        }
+        
+        .volume-bar {
+            width: 4px;
+            height: 100%;
+            background: #4a5568;
+            border-radius: 2px;
+            transform-origin: bottom;
+            transition: transform 0.1s ease, background-color 0.2s ease, opacity 0.2s ease;
+        }
+        
+        .mic-btn-enhanced {
+            position: relative;
+            overflow: visible;
+        }
+        
+        .mic-btn-enhanced.listening::after {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            border: 2px solid rgba(239, 68, 68, 0.5);
+            animation: ripple 1.5s ease-out infinite;
+        }
+        
+        @keyframes ripple {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        
+        .voice-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 9999px;
+            color: #fca5a5;
+            font-size: 0.9rem;
+            backdrop-filter: blur(4px);
+        }
+        
+        .voice-hint .dot {
+            width: 10px;
+            height: 10px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: dotPulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes dotPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.6; }
+        }
+
         /* 新手引導氣泡 */
         .guide-bubble {
             position: relative;
@@ -856,8 +920,8 @@
                                 <div class="flex gap-2">
                                     <!-- 語音輸入按鈕 -->
                                     <button onclick="startVoiceInput('chat-input')" id="chat-mic-btn"
-                                        class="w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center hover:scale-110 transition shrink-0"
-                                        title="點擊說日文">
+                                        class="mic-btn-enhanced w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center hover:scale-110 transition shrink-0"
+                                        title="點擊開始說日文（說完會自動停止並發送）">
                                         <i class="fa-solid fa-microphone text-lg"></i>
                                     </button>
                                     <input type="text" id="chat-input" 
@@ -873,11 +937,20 @@
                                     <i class="fa-solid fa-keyboard text-blue-400 mr-1"></i>或直接打字（日文/中文皆可）
                                 </p>
                                 <!-- 語音辨識狀態 -->
-                                <div id="chat-voice-status" class="hidden mt-2 text-center">
-                                    <div class="inline-flex items-center gap-2 bg-red-500/20 text-red-400 px-4 py-2 rounded-full text-sm">
-                                        <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                                        <span>正在聆聽您說的日文...</span>
+                                <div id="chat-voice-status" class="hidden mt-3 text-center">
+                                    <div class="voice-hint">
+                                        <span class="dot"></span>
+                                        <span>正在聆聽日文...</span>
+                                        <!-- 即時音量指示器 -->
+                                        <div id="chat-volume-indicator" class="volume-indicator">
+                                            <div class="volume-bar"></div>
+                                            <div class="volume-bar"></div>
+                                            <div class="volume-bar"></div>
+                                            <div class="volume-bar"></div>
+                                            <div class="volume-bar"></div>
+                                        </div>
                                     </div>
+                                    <p class="text-xs text-gray-400 mt-2">💡 說完後會自動結束識別並發送</p>
                                 </div>
                             </div>
                         </div>
@@ -1006,92 +1079,211 @@
         };
 
         // 主題設定 - label 顯示中文, value 傳給 API
+        // 完整版 - 涵蓋日本生活所有場景
         const TOPICS = {
             flashcard: [
+                // === 基礎入門 ===
                 { label: '゛゜ 拗音・濁音強化', value: 'Youon and dakuten practice for kana' },
+                { label: '🔢 數字與計數', value: 'Numbers, counting, and counters in Japanese' },
+                { label: '📅 時間日期', value: 'Time, dates, days of week in Japanese' },
                 { label: '🙌 基本問候', value: 'Greetings and self introduction in Japanese' },
+                { label: '👨‍👩‍👧 家人稱謂', value: 'Family members and relationships in Japanese' },
+                // === 日常生活 ===
                 { label: '🏠 日常生活', value: 'Daily life Japanese vocabulary' },
-                { label: '✈️ 旅遊出行', value: 'Travel Japanese for tourists' },
+                { label: '🍳 家事料理', value: 'Housework and cooking vocabulary' },
+                { label: '👕 衣物穿搭', value: 'Clothes and fashion vocabulary' },
+                { label: '🛋️ 家具電器', value: 'Furniture and home appliances' },
+                { label: '🌤️ 天氣季節', value: 'Weather and seasons vocabulary' },
+                // === 外出用餐 ===
                 { label: '🍣 餐廳點餐', value: 'Ordering food and drinks in Japanese' },
+                { label: '🍜 拉麵壽司專門', value: 'Ramen and sushi restaurant vocabulary' },
+                { label: '🍺 居酒屋用語', value: 'Izakaya bar vocabulary and phrases' },
+                { label: '☕ 咖啡廳甜點', value: 'Cafe and dessert vocabulary' },
+                { label: '🏪 便利商店', value: 'Convenience store vocabulary' },
+                // === 交通出行 ===
+                { label: '✈️ 旅遊出行', value: 'Travel Japanese for tourists' },
                 { label: '🛤️ 交通車站', value: 'Train station and transport phrases' },
+                { label: '🚌 問路移動', value: 'Asking directions and transportation' },
+                { label: '🚕 計程車叫車', value: 'Taxi and ride-hailing vocabulary' },
+                { label: '✈️ 機場海關', value: 'Airport and customs vocabulary' },
+                // === 購物消費 ===
                 { label: '🛍️ 購物結帳', value: 'Shopping and payments in Japanese' },
+                { label: '👗 服飾店試穿', value: 'Clothing store and trying on clothes' },
+                { label: '💄 藥妝店採購', value: 'Drugstore and cosmetics shopping' },
+                { label: '🎮 電器3C', value: 'Electronics and tech shopping' },
+                // === 住宿 ===
+                { label: '🏨 訂房入住', value: 'Hotel booking and check-in dialogues' },
+                { label: '🛏️ 民宿Airbnb', value: 'Airbnb and guesthouse vocabulary' },
+                { label: '🏠 租屋簽約', value: 'Apartment rental and contracts' },
+                // === 醫療健康 ===
                 { label: '🏥 醫院藥局', value: 'Doctor visit and pharmacy Japanese' },
+                { label: '🦷 牙醫眼科', value: 'Dentist and eye doctor vocabulary' },
+                { label: '💊 症狀描述', value: 'Describing symptoms and illness' },
+                // === 工作商務 ===
                 { label: '💼 商務敬語入門', value: 'Basic business Japanese and keigo' },
+                { label: '📞 電話應對', value: 'Phone call etiquette and phrases' },
+                { label: '✉️ 商務郵件', value: 'Business email vocabulary' },
+                { label: '🤝 會議簡報', value: 'Meeting and presentation vocabulary' },
                 { label: '📞 客服客訴', value: 'Customer support and complaint handling' },
                 { label: '👩‍💻 IT/工程', value: 'IT and software development Japanese' },
-                { label: '🎎 禮節文化', value: 'Japanese etiquette and culture' },
-                { label: '🚨 緊急應變', value: 'Emergency and disaster phrases' },
+                // === 社交生活 ===
                 { label: '👥 交友聊天', value: 'Casual chats and slang with friends' },
-                { label: '🏨 訂房入住', value: 'Hotel booking and check-in dialogues' },
-                { label: '🚌 問路移動', value: 'Asking directions and transportation' }
+                { label: '🎎 禮節文化', value: 'Japanese etiquette and culture' },
+                { label: '🎉 派對聚會', value: 'Party and social gathering vocabulary' },
+                { label: '💕 約會戀愛', value: 'Dating and romance vocabulary' },
+                // === 娛樂休閒 ===
+                { label: '🎬 電影動漫', value: 'Movies and anime vocabulary' },
+                { label: '🎮 遊戲電競', value: 'Gaming and esports vocabulary' },
+                { label: '⚽ 運動健身', value: 'Sports and fitness vocabulary' },
+                { label: '🎵 音樂演唱會', value: 'Music and concert vocabulary' },
+                // === 緊急狀況 ===
+                { label: '🚨 緊急應變', value: 'Emergency and disaster phrases' },
+                { label: '👮 警察求助', value: 'Police and lost items vocabulary' },
+                { label: '🔥 地震避難', value: 'Earthquake and evacuation phrases' }
             ],
             quiz: [
+                { label: '🔢 數字與計數', value: 'Numbers, counting, and counters in Japanese' },
                 { label: '🙌 基本問候', value: 'Greetings and self introduction in Japanese' },
                 { label: '🏠 日常生活', value: 'Daily life Japanese vocabulary' },
                 { label: '✈️ 旅遊出行', value: 'Travel Japanese for tourists' },
                 { label: '🍣 餐廳點餐', value: 'Ordering food and drinks in Japanese' },
                 { label: '🛍️ 購物結帳', value: 'Shopping and payments in Japanese' },
                 { label: '💼 商務敬語入門', value: 'Basic business Japanese and keigo' },
-                { label: '📞 客服客訴', value: 'Customer support and complaint handling' },
+                { label: '📞 電話應對', value: 'Phone call etiquette and phrases' },
                 { label: '👩‍💻 IT/工程', value: 'IT and software development Japanese' },
                 { label: '🚨 緊急應變', value: 'Emergency and disaster phrases' },
-                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' }
+                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' },
+                { label: '💊 症狀描述', value: 'Describing symptoms and illness' }
             ],
             typing: [
                 { label: '゛゜ 拗音・濁音強化', value: 'Youon and dakuten practice for kana' },
+                { label: '🙌 基本問候', value: 'Greetings and self introduction in Japanese' },
                 { label: '🏠 日常生活', value: 'Daily life Japanese vocabulary' },
                 { label: '🍣 餐廳點餐', value: 'Ordering food and drinks in Japanese' },
                 { label: '🛤️ 交通車站', value: 'Train station and transport phrases' },
                 { label: '🛍️ 購物結帳', value: 'Shopping and payments in Japanese' },
-                { label: '📞 客服客訴', value: 'Customer support and complaint handling' },
-                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' }
+                { label: '📞 電話應對', value: 'Phone call etiquette and phrases' },
+                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' },
+                { label: '💊 症狀描述', value: 'Describing symptoms and illness' }
             ],
             listening: [
                 { label: '🙌 基本問候', value: 'Greetings and self introduction in Japanese' },
+                { label: '🔢 數字與計數', value: 'Numbers, counting, and counters in Japanese' },
                 { label: '🏠 日常生活', value: 'Daily life Japanese vocabulary' },
                 { label: '✈️ 旅遊出行', value: 'Travel Japanese for tourists' },
                 { label: '🍣 餐廳點餐', value: 'Ordering food and drinks in Japanese' },
                 { label: '🛤️ 交通車站', value: 'Train station and transport phrases' },
                 { label: '🚨 緊急應變', value: 'Emergency and disaster phrases' },
-                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' }
+                { label: '📞 電話應對', value: 'Phone call etiquette and phrases' },
+                { label: '👥 交友聊天', value: 'Casual chats and slang with friends' },
+                { label: '🏪 便利商店', value: 'Convenience store vocabulary' }
             ],
             grammar: [
+                // === 基礎文法 ===
                 { label: 'は・が 主題 vs 主語', value: 'Particles wa vs ga usage' },
                 { label: 'を／に／で 的差別', value: 'Particles wo ni de usage' },
+                { label: 'へ／から／まで 方向', value: 'Direction particles he kara made' },
                 { label: 'です・ます體與普通形', value: 'Polite vs plain forms' },
+                // === 動詞變化 ===
                 { label: 'て形的連接', value: 'Te-form connections' },
                 { label: 'ない形否定', value: 'Negative nai form' },
                 { label: 'た形與過去式', value: 'Ta form and past tense' },
                 { label: '可能形表能力', value: 'Potential form' },
+                { label: '意向形表意願', value: 'Volitional form expressing intention' },
+                { label: '命令形與禁止形', value: 'Imperative and prohibitive forms' },
+                { label: '受身形（被動）', value: 'Passive form in Japanese' },
+                { label: '使役形（讓...做）', value: 'Causative form in Japanese' },
+                // === 表達句型 ===
                 { label: '〜たい／〜たくない', value: 'Expressing desire tai form' },
+                { label: '〜てほしい 希望別人做', value: 'Wanting someone to do something' },
+                { label: '〜ている 進行與狀態', value: 'Te-iru progressive and state' },
+                { label: '〜てある 結果狀態', value: 'Te-aru resultative state' },
+                { label: '〜ておく 事先準備', value: 'Te-oku preparation' },
+                { label: '〜てみる 嘗試做', value: 'Te-miru trying to do' },
+                { label: '〜てしまう 完成/遺憾', value: 'Te-shimau completion or regret' },
+                // === 原因與假設 ===
                 { label: '原因 から／ので', value: 'Giving reasons with kara/no de' },
                 { label: 'もし〜たら／なら 假設', value: 'Conditional patterns in Japanese' },
+                { label: '〜ば假定形', value: 'Ba conditional form' },
+                { label: '〜と自然條件', value: 'To conditional for natural results' },
+                // === 許可與義務 ===
                 { label: '〜てもいい／〜てはいけない', value: 'Permission and prohibition' },
+                { label: '〜なければならない 義務', value: 'Expressing obligation must do' },
+                { label: '〜なくてもいい 不必', value: 'Not necessary to do' },
+                // === 敬語系統 ===
                 { label: '敬語入門', value: 'Keigo basics for beginners' },
+                { label: '尊敬語（相手を上げる）', value: 'Sonkeigo honorific language' },
+                { label: '謙譲語（自分を下げる）', value: 'Kenjougo humble language' },
                 { label: 'クッション言葉', value: 'Softening phrases for politeness' },
-                { label: '電話應對常用句', value: 'Phone call keigo patterns' }
+                { label: '電話應對常用句', value: 'Phone call keigo patterns' },
+                // === 進階表達 ===
+                { label: '〜そう／〜よう 推測', value: 'Expressing conjecture sou you' },
+                { label: '〜らしい 傳聞', value: 'Hearsay rashii' },
+                { label: '〜ようにする 努力', value: 'Making effort to do' },
+                { label: '〜ことにする 決定', value: 'Deciding to do' }
             ],
             chat: [
+                // === 🍽️ 餐飲美食 ===
                 { label: '☕ 咖啡廳點餐', value: 'Japanese Coffee Shop' },
                 { label: '🍜 拉麵店用餐', value: 'Ramen shop' },
-                { label: '🛤️ 車站購票', value: 'Train station ticket' },
-                { label: '🏨 飯店入住', value: 'Hotel check-in in Japan' },
-                { label: '🏪 便利商店', value: 'Convenience store in Japan' },
+                { label: '🍣 壽司店互動', value: 'Sushi restaurant' },
                 { label: '🍺 居酒屋聊天', value: 'Izakaya small talk' },
+                { label: '🏪 便利商店', value: 'Convenience store in Japan' },
+                { label: '🍔 速食店點餐', value: 'Fast food restaurant order' },
+                { label: '🍰 甜點蛋糕店', value: 'Dessert and cake shop' },
+                // === 🚃 交通出行 ===
+                { label: '🛤️ 車站購票', value: 'Train station ticket' },
                 { label: '🗺️ 問路與方向', value: 'Asking for directions in Japanese' },
+                { label: '🚕 搭計程車', value: 'Taking a taxi in Japan' },
+                { label: '🚌 搭公車', value: 'Taking a bus in Japan' },
+                { label: '✈️ 機場報到', value: 'Airport check-in and boarding' },
+                // === 🏨 住宿 ===
+                { label: '🏨 飯店入住', value: 'Hotel check-in in Japan' },
+                { label: '🛏️ 民宿溝通', value: 'Guesthouse communication' },
+                { label: '🏠 看房租屋', value: 'Apartment viewing and rental' },
+                // === 🛍️ 購物 ===
+                { label: '👗 服飾店購物', value: 'Clothing store shopping' },
+                { label: '💄 藥妝店採購', value: 'Drugstore shopping' },
+                { label: '🎮 電器店詢問', value: 'Electronics store inquiry' },
+                { label: '🎁 百貨公司退換', value: 'Department store returns' },
+                // === 🏥 醫療 ===
                 { label: '💊 藥局買藥', value: 'Pharmacy conversation' },
+                { label: '🏥 看診描述症狀', value: 'Describing symptoms to a doctor' },
+                { label: '🦷 牙醫預約', value: 'Dental appointment' },
+                // === 👥 社交 ===
                 { label: '👋 認識新朋友', value: 'Meeting new friends in Japanese' },
-                { label: '📞 客服與抱怨', value: 'Customer support and complaints in Japanese' },
+                { label: '🎉 聚會派對', value: 'Party and social gathering' },
+                { label: '🏠 鄰里交流', value: 'Chatting with neighbors' },
+                { label: '💕 約會對話', value: 'Dating conversation' },
+                { label: '🎎 禮儀寒暄', value: 'Etiquette and polite small talk' },
+                // === 💼 工作商務 ===
+                { label: '📞 商務電話', value: 'Business phone call' },
                 { label: '💼 商務會議', value: 'Business meeting in Japanese' },
                 { label: '👩‍💻 專案協作', value: 'Project collaboration in IT' },
-                { label: '🏥 看診描述症狀', value: 'Describing symptoms to a doctor' },
+                { label: '📞 客服與抱怨', value: 'Customer support and complaints in Japanese' },
+                { label: '🤝 面試應對', value: 'Job interview in Japanese' },
+                // === 🚨 緊急狀況 ===
                 { label: '🚨 求助與緊急', value: 'Emergency help in Japanese' },
-                { label: '🎎 禮儀寒暄', value: 'Etiquette and polite small talk' },
-                { label: '🏠 鄰里交流', value: 'Chatting with neighbors' }
+                { label: '👮 警察報案', value: 'Reporting to police' },
+                { label: '📱 遺失物品', value: 'Lost and found items' },
+                // === 🎭 特殊場景 ===
+                { label: '💇 美容院剪髮', value: 'Hair salon conversation' },
+                { label: '🏋️ 健身房入會', value: 'Gym membership inquiry' },
+                { label: '📮 郵局寄件', value: 'Post office mailing' },
+                { label: '🏦 銀行開戶', value: 'Bank account opening' }
             ],
             kana: [
                 { label: '🈁 平假名五十音', value: 'Hiragana gojūon (basic vowels and consonants)' },
                 { label: '🈂️ 片假名五十音', value: 'Katakana gojūon (basic vowels and consonants)' }
+            ],
+            // 新增：生存日語速成
+            survival: [
+                { label: '🆘 超基本生存句', value: 'Essential survival phrases' },
+                { label: '🙏 萬用禮貌句', value: 'Universal polite expressions' },
+                { label: '❓ 問句模板', value: 'Question patterns' },
+                { label: '🔢 數字金額', value: 'Numbers and prices' },
+                { label: '⏰ 時間表達', value: 'Time expressions' },
+                { label: '📍 位置方向', value: 'Location and directions' }
             ]
         };
 
@@ -1799,75 +1991,98 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
 }`;
 
                 case 'chat':
-                    // 讓 AI 自動判斷語言
-                    return `You are an AI Japanese conversation partner and teacher in a language learning app.
+                    // 強化版 AI 對話教練
+                    return `You are a native Japanese speaker working as a professional Japanese conversation coach. You're roleplaying in a specific scenario to help learners practice REAL Japanese conversation.
 
-**Scenario:** ${topic}
-**User's Level:** ${level} (${levelDesc})
-**User said:** "${userMessage}"
+**Current Scenario:** ${topic}
+**Learner's Level:** ${level} (${levelDesc})
+**Learner said:** "${userMessage}"
 
-**IMPORTANT - Language Detection:**
-First, determine what language the user is speaking:
-- If the user wrote in **Traditional Chinese** (繁體中文), set "isChinese": true
-- If the user wrote in **Japanese** (日本語), set "isChinese": false
-- If the user wrote in **English** or other languages, treat it as if they want to learn Japanese and set "isChinese": true (provide Japanese translation)
-- If the message is mixed (e.g., Chinese + Japanese), determine the PRIMARY language based on the majority of content
+## STEP 1: Language Detection
+Detect what language the learner is using:
+- **Traditional Chinese (繁體中文)** → set "isChinese": true
+- **Japanese (日本語)** → set "isChinese": false  
+- **English or mixed** → set "isChinese": true (help them learn the Japanese)
 
-**Your Task (if isChinese = true):**
-1. Translate the user's message into natural Japanese appropriate for ${level} level.
-2. Provide pronunciation guidance (romaji and pronunciation tips).
-3. Explain the grammar and vocabulary used.
-4. Provide a natural Japanese response to continue the conversation.
-5. Encourage the user to practice saying the Japanese translation.
+## STEP 2A: If isChinese = true (Teaching Mode)
+The learner wants to learn how to say something in Japanese. Your job:
 
-**Your Task (if isChinese = false):**
-1. Reply naturally in Japanese as the other person in this scenario.
-2. Keep the language appropriate for ${level} level.
-3. Analyze the user's Japanese carefully and provide detailed feedback.
-4. Give an ACCURATE score (0-100) based on:
-   - **Grammar accuracy** (30 points): Correct use of particles, verb forms, sentence structure
-   - **Vocabulary appropriateness** (30 points): Suitable word choice for the level and context
-   - **Naturalness** (25 points): Does it sound like native Japanese? Proper politeness level?
-   - **Completeness** (15 points): Does it fully express the intended meaning?
+1. **Translate naturally** - Don't be too formal/textbook-like. Use what real Japanese people would say in this ${topic} scenario.
+2. **Provide 2-3 alternative expressions** when relevant (casual vs polite, short vs long)
+3. **Highlight key vocabulary** with readings
+4. **Explain the grammar pattern** simply
+5. **Continue the roleplay** - respond as if you're the other person in this scenario
+6. **Give a practice sentence** - suggest what they might say next in the conversation
 
-**Scoring Guidelines (only when isChinese = false):**
-- 90-100: Excellent - Native-like, perfect grammar, natural expressions
-- 80-89: Very Good - Minor errors, mostly natural, appropriate for level
-- 70-79: Good - Some errors but understandable, needs improvement
-- 60-69: Fair - Multiple errors, awkward phrasing, but meaning is clear
-- 50-59: Poor - Many errors, hard to understand, needs significant work
-- 0-49: Very Poor - Major errors, incomprehensible, or completely wrong
+## STEP 2B: If isChinese = false (Practice Mode)
+The learner is practicing Japanese. Respond naturally as the other person in this scenario, then:
 
-**IMPORTANT:** Score must reflect the ACTUAL quality of the user's Japanese. Do NOT give the same score every time. Vary scores based on real performance.
+1. **Reply in-character** - Be a real Japanese person (shop staff, friend, etc.)
+2. **Score fairly (0-100):**
+   - Grammar (30pts): particles, verb forms, sentence structure
+   - Vocabulary (30pts): appropriate words for context  
+   - Naturalness (25pts): sounds like a native? right politeness level?
+   - Completeness (15pts): fully expresses the meaning?
+3. **Give specific feedback** - point out exact errors and how to fix them
+4. **Suggest improvements** - show a better/more natural way to say it
+5. **Continue the conversation** - keep the roleplay going
 
-**Output Format (JSON only, no markdown):**
+## Scoring Standards (IMPORTANT - vary scores based on actual quality):
+- 95-100: Perfect, native-level, no errors
+- 85-94: Excellent, very minor issues
+- 75-84: Good, some errors but natural
+- 65-74: OK, understandable but needs work
+- 50-64: Weak, many errors
+- Below 50: Major issues, hard to understand
+
+## OUTPUT FORMAT (JSON only, no markdown):
 
 If isChinese = true:
 {
     "isChinese": true,
-    "japanese": "日文翻譯（自然的日文表達）",
-    "kana": "假名標註（如有漢字）",
+    "japanese": "最自然的日文表達方式",
+    "kana": "完整假名標註",
     "romaji": "羅馬拼音",
-    "pronunciation": "發音提示（用繁體中文說明發音重點）",
-    "grammar": "文法說明（用繁體中文解釋使用的文法）",
-    "vocabulary": "單字解釋（用繁體中文說明重要單字）",
-    "reply": "你的日文回覆（繼續對話，2-3 sentences）",
+    "alternatives": ["其他說法1", "其他說法2"],
+    "keyVocab": [
+        {"word": "單字", "reading": "よみかた", "meaning": "意思"}
+    ],
+    "grammarPoint": "使用的文法說明（繁體中文，簡短易懂）",
+    "pronunciation": "發音重點提示",
+    "reply": "繼續對話的日文回覆（作為場景中的另一方）",
+    "replyKana": "回覆的假名",
     "chinese": "回覆的繁體中文翻譯",
-    "encouragement": "鼓勵用戶練習說這句話（用繁體中文）"
+    "nextSuggestion": "建議學習者接下來可以說的句子（日文）",
+    "nextSuggestionChinese": "建議句子的中文意思",
+    "cultureTip": "相關的日本文化小知識（選填，如果有的話）"
 }
 
 If isChinese = false:
 {
     "isChinese": false,
-    "reply": "你的日文回覆 (2-3 sentences, keep natural)",
+    "reply": "你的日文回覆（保持角色扮演，自然對話）",
+    "replyKana": "回覆的假名",
     "chinese": "回覆的繁體中文翻譯",
-    "score": [VARY THIS - evaluate each message individually, 0-100],
-    "feedback": "對用戶日文的具體建議（用繁體中文），指出優點和需要改進的地方，要具體說明哪裡有錯誤或可以更好的地方"
+    "score": 具體分數(0-100),
+    "scoreBreakdown": {
+        "grammar": 分數,
+        "vocabulary": 分數,
+        "naturalness": 分數,
+        "completeness": 分數
+    },
+    "feedback": "具體的評語（繁體中文）- 說明哪裡做得好，哪裡需要改進",
+    "correction": "如果有錯誤，這裡放正確的說法",
+    "betterWay": "更自然的說法（如果有的話）",
+    "nextSuggestion": "建議接下來可以說的日文",
+    "nextSuggestionChinese": "建議的中文意思"
 }
 
-**CRITICAL:** 
-- You MUST accurately detect the language. Check if the message is primarily Chinese characters (繁體中文) or Japanese characters (ひらがな、カタカナ、漢字).
-- For scores, evaluate each message individually. Never use the same score repeatedly.
+## CRITICAL REMINDERS:
+- Stay in character for the ${topic} scenario throughout
+- Use appropriate politeness level (店員說敬語、朋友用普通形)
+- Give varied, honest scores - NOT always 75-85
+- Be encouraging but truthful about errors
+- Make the conversation feel REAL and practical
 }`;
 
                 default:
@@ -1877,23 +2092,44 @@ If isChinese = false:
 
         // 呼叫 Gemini API
         async function callGeminiAPI(prompt) {
-            const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+            let response;
+            try {
+                response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
                     method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 1.0,  // 提高隨機性
-                        topP: 0.95,        // 增加多樣性
-                        topK: 40,
-                        maxOutputTokens: 2048
-                    }
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            temperature: 1.0,
+                            topP: 0.95,
+                            topK: 40,
+                            maxOutputTokens: 2048
+                        }
                     })
                 });
+            } catch (fetchError) {
+                // 網路請求本身失敗
+                console.error('Fetch 錯誤:', fetchError);
+                if (window.location.protocol === 'file:') {
+                    throw new Error('請使用本地伺服器開啟此頁面（不要直接開啟 HTML 檔案）\n\n解決方法：\n1. 安裝 VS Code 的 Live Server\n2. 或執行: python -m http.server 8080');
+                }
+                throw new Error(`網路請求失敗: ${fetchError.message}\n請檢查網路連線和 API Key`);
+            }
                 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || 'API 呼叫失敗');
+                let errorMsg = 'API 呼叫失敗';
+                try {
+                    const error = await response.json();
+                    errorMsg = error.error?.message || `HTTP ${response.status}`;
+                    if (response.status === 400) {
+                        errorMsg = 'API Key 無效或請求格式錯誤';
+                    } else if (response.status === 403) {
+                        errorMsg = 'API Key 沒有權限，請確認已啟用 Gemini API';
+                    } else if (response.status === 429) {
+                        errorMsg = 'API 請求次數超過限制，請稍後再試';
+                    }
+                } catch (e) {}
+                throw new Error(errorMsg);
             }
 
             const result = await response.json();
@@ -2558,17 +2794,56 @@ If isChinese = false:
             return topic ? topic.label : value;
         }
 
-        // 情境對話的中文歡迎語
+        // 情境對話的中文歡迎語 - 完整版
         const CHAT_GREETINGS = {
+            // === 餐飲美食 ===
             'Japanese Coffee Shop': { greeting: 'いらっしゃいませ。コーヒーはホットとアイス、どちらにされますか？', chinese: '歡迎光臨，咖啡要熱的還是冰的呢？' },
             'Ramen shop': { greeting: 'いらっしゃい！食券はお買い求めですか？おすすめは醤油ラーメンですよ。', chinese: '歡迎！有先買食券嗎？推薦醬油拉麵喔。' },
-            'Train station ticket': { greeting: 'どちらまで行かれますか？ICカードはお持ちですか？', chinese: '請問要到哪一站？有 IC 卡嗎？' },
-            'Hotel check-in in Japan': { greeting: 'ようこそお越しくださいました。ご予約のお名前を頂けますか？', chinese: '歡迎光臨，請告訴我預訂的名字。' },
-            'Convenience store in Japan': { greeting: 'いらっしゃいませ。袋はご利用になりますか？', chinese: '歡迎光臨，需要購物袋嗎？' },
+            'Sushi restaurant': { greeting: 'いらっしゃいませ！カウンター席とテーブル席、どちらがよろしいですか？', chinese: '歡迎光臨！請問要坐吧檯還是桌席？' },
             'Izakaya small talk': { greeting: 'こんばんは！お飲み物は何にしますか？生ビールでよろしいですか？', chinese: '晚上好！想先喝點什麼？要生啤嗎？' },
+            'Convenience store in Japan': { greeting: 'いらっしゃいませ。袋はご利用になりますか？', chinese: '歡迎光臨，需要購物袋嗎？' },
+            'Fast food restaurant order': { greeting: 'いらっしゃいませ。こちらでお召し上がりですか、お持ち帰りですか？', chinese: '歡迎光臨，請問內用還是外帶？' },
+            'Dessert and cake shop': { greeting: 'いらっしゃいませ。本日のおすすめはモンブランです。ご試食いかがですか？', chinese: '歡迎光臨，今日推薦是蒙布朗蛋糕。要試吃嗎？' },
+            // === 交通出行 ===
+            'Train station ticket': { greeting: 'どちらまで行かれますか？ICカードはお持ちですか？', chinese: '請問要到哪一站？有 IC 卡嗎？' },
             'Asking for directions in Japanese': { greeting: 'こんにちは。どちらへ行きたいですか？近い道をお伝えしますね。', chinese: '你好，想去哪裡？我告訴你較近的路線。' },
+            'Taking a taxi in Japan': { greeting: 'ご乗車ありがとうございます。どちらまで行かれますか？住所はありますか？', chinese: '感謝搭乘，請問到哪裡？有地址嗎？' },
+            'Taking a bus in Japan': { greeting: 'このバスは渋谷駅行きです。どちらまで行かれますか？', chinese: '這班公車開往澀谷站。請問您到哪裡？' },
+            'Airport check-in and boarding': { greeting: 'おはようございます。チェックインですか？パスポートと予約番号をお願いします。', chinese: '早安，是要辦理報到嗎？請出示護照和訂位編號。' },
+            // === 住宿 ===
+            'Hotel check-in in Japan': { greeting: 'ようこそお越しくださいました。ご予約のお名前を頂けますか？', chinese: '歡迎光臨，請告訴我預訂的名字。' },
+            'Guesthouse communication': { greeting: 'ようこそ！チェックインは15時からですが、荷物は先にお預かりできますよ。', chinese: '歡迎！入住是下午3點開始，但行李可以先寄放喔。' },
+            'Apartment viewing and rental': { greeting: 'こんにちは、不動産のタナカです。今日は1LDKのお部屋を見られますね。', chinese: '你好，我是不動產的田中。今天要看的是一房一廳的房間。' },
+            // === 購物 ===
+            'Clothing store shopping': { greeting: 'いらっしゃいませ。何かお探しですか？試着室はあちらです。', chinese: '歡迎光臨，在找什麼嗎？試衣間在那邊。' },
+            'Drugstore shopping': { greeting: 'いらっしゃいませ。本日はポイント2倍デーです。何かお探しですか？', chinese: '歡迎光臨，今天是點數兩倍日。在找什麼嗎？' },
+            'Electronics store inquiry': { greeting: 'いらっしゃいませ。何かお探しですか？最新のiPhoneは品切れですが、予約可能です。', chinese: '歡迎光臨，在找什麼嗎？最新iPhone缺貨中，但可以預購。' },
+            'Department store returns': { greeting: 'いらっしゃいませ。返品・交換のご相談ですか？レシートはお持ちですか？', chinese: '歡迎光臨，是要退換貨嗎？有帶收據嗎？' },
+            // === 醫療 ===
             'Pharmacy conversation': { greeting: 'こんにちは。どのような症状ですか？熱はありますか？', chinese: '你好，哪裡不舒服？有發燒嗎？' },
-            'Meeting new friends in Japanese': { greeting: 'はじめまして！どこから来ましたか？日本は初めてですか？', chinese: '初次見面！你從哪裡來？第一次來日本嗎？' }
+            'Describing symptoms to a doctor': { greeting: 'お待たせしました。今日はどうされましたか？いつから具合が悪いですか？', chinese: '讓您久等了。今天怎麼了？從什麼時候開始不舒服的？' },
+            'Dental appointment': { greeting: 'おはようございます。今日は定期検診ですか？それとも何か気になるところがありますか？', chinese: '早安，今天是定期檢查嗎？還是有什麼不舒服的地方？' },
+            // === 社交 ===
+            'Meeting new friends in Japanese': { greeting: 'はじめまして！どこから来ましたか？日本は初めてですか？', chinese: '初次見面！你從哪裡來？第一次來日本嗎？' },
+            'Party and social gathering': { greeting: 'ようこそ！飲み物をどうぞ。今日のパーティーは誰の紹介で来ましたか？', chinese: '歡迎！請喝飲料。今天是誰介紹你來的？' },
+            'Chatting with neighbors': { greeting: 'あ、こんにちは！引っ越してきたんですか？よろしくお願いします。', chinese: '啊，你好！是剛搬來的嗎？請多指教。' },
+            'Dating conversation': { greeting: 'こんにちは！今日は来てくれてありがとう。何か食べたいものある？', chinese: '你好！謝謝你今天來。有想吃什麼嗎？' },
+            'Etiquette and polite small talk': { greeting: 'いつもお世話になっております。本日はお忙しい中お時間いただきありがとうございます。', chinese: '承蒙關照。感謝您百忙之中抽空。' },
+            // === 工作商務 ===
+            'Business phone call': { greeting: 'お電話ありがとうございます。〇〇株式会社でございます。どのようなご用件でしょうか？', chinese: '感謝來電，這裡是〇〇股份有限公司。請問有什麼事呢？' },
+            'Business meeting in Japanese': { greeting: '本日はお忙しい中お集まりいただきありがとうございます。それでは会議を始めましょう。', chinese: '感謝各位百忙之中前來。那麼開始會議吧。' },
+            'Project collaboration in IT': { greeting: 'おはようございます。今日のスタンドアップミーティングを始めましょう。昨日の進捗はいかがですか？', chinese: '早安，開始今天的站立會議吧。昨天的進度如何？' },
+            'Customer support and complaints in Japanese': { greeting: 'お電話ありがとうございます。どのようなご用件でしょうか？お困りのことをお聞かせください。', chinese: '感謝來電，請問有什麼事？請告訴我您遇到的問題。' },
+            'Job interview in Japanese': { greeting: '本日はお越しいただきありがとうございます。まず自己紹介をお願いできますか？', chinese: '感謝您今天前來。首先可以請您自我介紹嗎？' },
+            // === 緊急狀況 ===
+            'Emergency help in Japanese': { greeting: '119です。火事ですか？救急ですか？現在の住所を教えてください。', chinese: '這裡是119。是火災還是急救？請告訴我現在的地址。' },
+            'Reporting to police': { greeting: '110です。どうされましたか？事件ですか、事故ですか？', chinese: '這裡是110。怎麼了？是案件還是事故？' },
+            'Lost and found items': { greeting: 'いらっしゃいませ。お忘れ物ですか？いつ、どこでなくされましたか？', chinese: '您好，是遺失物品嗎？什麼時候、在哪裡弄丟的？' },
+            // === 特殊場景 ===
+            'Hair salon conversation': { greeting: 'いらっしゃいませ。今日はカットですか？どのくらい切りますか？', chinese: '歡迎光臨，今天是剪髮嗎？要剪多少？' },
+            'Gym membership inquiry': { greeting: 'いらっしゃいませ。ジムの見学ですか？月額プランと回数券がありますが、どちらがいいですか？', chinese: '歡迎光臨，是來參觀健身房嗎？有月費方案和次數券，您比較想要哪種？' },
+            'Post office mailing': { greeting: 'いらっしゃいませ。郵便ですか？荷物ですか？どちらへお送りになりますか？', chinese: '您好，是寄信還是寄包裹？要寄到哪裡？' },
+            'Bank account opening': { greeting: 'いらっしゃいませ。口座開設ですか？在留カードと印鑑はお持ちですか？', chinese: '您好，是要開戶嗎？有帶在留卡和印章嗎？' }
         };
 
         function initChat() {
@@ -2654,102 +2929,207 @@ If isChinese = false:
                     const safeKana = (data.kana || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                     const safeRomaji = (data.romaji || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                     const safeReply = (data.reply || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const safeNextSuggestion = (data.nextSuggestion || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    
+                    // 處理替代說法
+                    let alternativesHtml = '';
+                    if (data.alternatives && data.alternatives.length > 0) {
+                        alternativesHtml = `
+                            <div class="mt-2 pt-2 border-t border-purple-500/20">
+                                <p class="text-xs text-purple-300 mb-1"><i class="fa-solid fa-shuffle mr-1"></i>其他說法：</p>
+                                <div class="flex flex-wrap gap-1">
+                                    ${data.alternatives.map(alt => `<span class="text-xs bg-purple-500/20 px-2 py-1 rounded cursor-pointer hover:bg-purple-500/30" onclick="speakText('${alt.replace(/'/g, "\\'")}')">${alt}</span>`).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // 處理關鍵詞彙
+                    let vocabHtml = '';
+                    if (data.keyVocab && data.keyVocab.length > 0) {
+                        vocabHtml = `
+                            <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-3">
+                                <p class="text-xs text-blue-300 mb-2"><i class="fa-solid fa-book-open mr-1"></i>重要單字：</p>
+                                <div class="space-y-1">
+                                    ${data.keyVocab.map(v => `<div class="text-xs"><span class="text-white font-medium">${v.word}</span> <span class="text-gray-400">(${v.reading})</span> - <span class="text-blue-200">${v.meaning}</span></div>`).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else if (data.vocabulary) {
+                        vocabHtml = `<div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-3"><p class="text-xs text-blue-300"><i class="fa-solid fa-list mr-1"></i><strong>單字：</strong>${data.vocabulary}</p></div>`;
+                    }
                     
                     messagesContainer.innerHTML += `
                         <div class="flex gap-3 animate-slide">
                             <div class="w-10 h-10 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
                                 <i class="fa-solid fa-robot"></i>
                             </div>
-                            <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[80%]">
+                            <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[85%]">
                                 <!-- 日文翻譯教學 -->
                                 <div class="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-4 mb-3">
                                     <div class="flex items-center gap-2 mb-2">
                                         <i class="fa-solid fa-language text-purple-400"></i>
-                                        <span class="text-sm font-bold text-purple-300">日文翻譯</span>
+                                        <span class="text-sm font-bold text-purple-300">這樣說日文</span>
                                     </div>
                                     <div class="flex items-start justify-between gap-2 mb-2">
                                         <div class="flex-1">
-                                            <p class="text-lg font-semibold mb-1">${data.japanese}</p>
+                                            <p class="text-xl font-bold mb-1">${data.japanese}</p>
                                             ${data.kana ? `<p class="text-sm text-gray-400 mb-1">${data.kana}</p>` : ''}
                                             ${data.romaji ? `<p class="text-sm text-blue-300 font-mono">${data.romaji}</p>` : ''}
                                         </div>
-                                        <div class="shrink-0 flex gap-1">
-                                            <button onclick="speakChatMessage(this, 0.6)" data-text="${safeJapanese}" 
-                                                class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速播放">
-                                                <i class="fa-solid fa-volume-low text-xs"></i>
+                                        <div class="shrink-0 flex flex-col gap-1">
+                                            <button onclick="speakChatMessage(this, 0.55)" data-text="${safeJapanese}" 
+                                                class="w-9 h-9 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="🐢 慢速">
+                                                <i class="fa-solid fa-volume-low text-sm"></i>
                                             </button>
                                             <button onclick="speakChatMessage(this, 0.85)" data-text="${safeJapanese}" 
-                                                class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常播放">
+                                                class="w-9 h-9 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="▶️ 正常">
                                                 <i class="fa-solid fa-volume-high text-sm"></i>
                                             </button>
                                         </div>
                                     </div>
-                                    ${data.pronunciation ? `<p class="text-xs text-yellow-300 mt-2"><i class="fa-solid fa-microphone mr-1"></i>發音提示：${data.pronunciation}</p>` : ''}
+                                    ${data.pronunciation ? `<p class="text-xs text-yellow-300 mt-2"><i class="fa-solid fa-microphone mr-1"></i>發音：${data.pronunciation}</p>` : ''}
+                                    ${alternativesHtml}
                                 </div>
                                 
-                                <!-- 文法與單字說明 -->
-                                ${data.grammar || data.vocabulary ? `
-                                <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-3">
-                                    ${data.grammar ? `<p class="text-xs text-blue-300 mb-1"><i class="fa-solid fa-book mr-1"></i><strong>文法：</strong>${data.grammar}</p>` : ''}
-                                    ${data.vocabulary ? `<p class="text-xs text-blue-300"><i class="fa-solid fa-list mr-1"></i><strong>單字：</strong>${data.vocabulary}</p>` : ''}
+                                <!-- 文法說明 -->
+                                ${data.grammarPoint || data.grammar ? `
+                                <div class="bg-green-500/10 border border-green-500/20 rounded-xl p-3 mb-3">
+                                    <p class="text-xs text-green-300"><i class="fa-solid fa-graduation-cap mr-1"></i><strong>文法：</strong>${data.grammarPoint || data.grammar}</p>
                                 </div>
                                 ` : ''}
                                 
-                                <!-- AI 回覆 -->
+                                <!-- 關鍵詞彙 -->
+                                ${vocabHtml}
+                                
+                                <!-- AI 回覆（繼續對話）-->
                                 <div class="border-t border-white/10 pt-3">
+                                    <p class="text-xs text-gray-400 mb-1"><i class="fa-solid fa-comment mr-1"></i>對方回覆：</p>
                                     <div class="flex items-start justify-between gap-2 mb-2">
-                                        <p class="flex-1">${data.reply}</p>
-                                        <div class="shrink-0 flex gap-1">
-                                            <button onclick="speakChatMessage(this, 0.6)" data-text="${safeReply}" 
-                                                class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速播放">
-                                                <i class="fa-solid fa-volume-low text-xs"></i>
-                                            </button>
-                                            <button onclick="speakChatMessage(this, 0.85)" data-text="${safeReply}" 
-                                                class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常播放">
-                                                <i class="fa-solid fa-volume-high text-sm"></i>
-                                            </button>
+                                        <div class="flex-1">
+                                            <p class="text-base">${data.reply}</p>
+                                            ${data.replyKana ? `<p class="text-xs text-gray-500">${data.replyKana}</p>` : ''}
                                         </div>
+                                        <button onclick="speakChatMessage(this, 0.85)" data-text="${safeReply}" 
+                                            class="shrink-0 w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="播放">
+                                            <i class="fa-solid fa-volume-high text-sm"></i>
+                                        </button>
                                     </div>
                                     <p class="text-xs text-gray-500">${data.chinese}</p>
                                 </div>
                                 
-                                <!-- 鼓勵練習 -->
-                                ${data.encouragement ? `<p class="text-xs text-green-300 mt-3 border-t border-white/10 pt-3"><i class="fa-solid fa-heart mr-1"></i>${data.encouragement}</p>` : ''}
+                                <!-- 下一步建議 -->
+                                ${data.nextSuggestion ? `
+                                <div class="mt-3 pt-3 border-t border-white/10 bg-gradient-to-r from-green-500/10 to-teal-500/10 rounded-lg p-3">
+                                    <p class="text-xs text-green-300 mb-1"><i class="fa-solid fa-lightbulb mr-1"></i>試試這樣說：</p>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-sm font-medium flex-1">${data.nextSuggestion}</p>
+                                        <button onclick="speakChatMessage(this, 0.7)" data-text="${safeNextSuggestion}" 
+                                            class="shrink-0 w-7 h-7 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 hover:bg-green-500/30 transition" title="播放">
+                                            <i class="fa-solid fa-play text-xs"></i>
+                                        </button>
+                                        <button onclick="document.getElementById('chat-input').value='${safeNextSuggestion}'" 
+                                            class="shrink-0 w-7 h-7 bg-teal-500/20 rounded-full flex items-center justify-center text-teal-400 hover:bg-teal-500/30 transition" title="填入輸入框">
+                                            <i class="fa-solid fa-paste text-xs"></i>
+                                        </button>
+                                    </div>
+                                    ${data.nextSuggestionChinese ? `<p class="text-xs text-gray-500 mt-1">${data.nextSuggestionChinese}</p>` : ''}
+                                </div>
+                                ` : ''}
+                                
+                                <!-- 文化小知識 -->
+                                ${data.cultureTip ? `<p class="text-xs text-pink-300 mt-3 pt-3 border-t border-white/10"><i class="fa-solid fa-torii-gate mr-1"></i>${data.cultureTip}</p>` : ''}
                             </div>
                         </div>
                     `;
                 } else {
-                    // 正常日文對話
+                    // 正常日文對話（練習模式）
                     const safeReply = (data.reply || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const safeNextSuggestion = (data.nextSuggestion || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    
+                    // 計算分數顏色
+                    const scoreColor = data.score >= 85 ? 'green' : data.score >= 70 ? 'yellow' : data.score >= 50 ? 'orange' : 'red';
+                    const scoreEmoji = data.score >= 85 ? '🎉' : data.score >= 70 ? '👍' : data.score >= 50 ? '💪' : '📚';
                     
                     messagesContainer.innerHTML += `
                         <div class="flex gap-3 animate-slide">
                             <div class="w-10 h-10 bg-gradient-to-br from-rose-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
                                 <i class="fa-solid fa-robot"></i>
                             </div>
-                            <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[80%]">
-                                <div class="flex items-start justify-between gap-2">
-                                    <p class="flex-1">${data.reply}</p>
+                            <div class="glass-card rounded-2xl rounded-tl-sm p-4 max-w-[85%]">
+                                <!-- AI 回覆 -->
+                                <div class="flex items-start justify-between gap-2 mb-2">
+                                    <div class="flex-1">
+                                        <p class="text-lg">${data.reply}</p>
+                                        ${data.replyKana ? `<p class="text-xs text-gray-500">${data.replyKana}</p>` : ''}
+                                    </div>
                                     <div class="shrink-0 flex gap-1">
                                         <button onclick="speakChatMessage(this, 0.6)" data-text="${safeReply}" 
-                                            class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速播放">
+                                            class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition" title="慢速">
                                             <i class="fa-solid fa-volume-low text-xs"></i>
                                         </button>
                                         <button onclick="speakChatMessage(this, 0.85)" data-text="${safeReply}" 
-                                            class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常播放">
+                                            class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/30 transition" title="正常">
                                             <i class="fa-solid fa-volume-high text-sm"></i>
                                         </button>
                                     </div>
                                 </div>
-                                <p class="text-xs text-gray-500 mt-2">${data.chinese}</p>
-                                ${data.feedback ? `<p class="text-xs text-yellow-400 mt-2 border-t border-white/10 pt-2">💡 ${data.feedback}</p>` : ''}
-                                ${data.score ? `<div class="mt-2 flex items-center gap-2">
-                                    <span class="text-xs text-gray-400">表達評分</span>
-                                    <div class="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                                        <div class="h-full ${data.score >= 80 ? 'bg-green-500' : data.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}" style="width: ${data.score}%"></div>
+                                <p class="text-xs text-gray-500 mb-3">${data.chinese}</p>
+                                
+                                <!-- 評分區塊 -->
+                                ${data.score !== undefined ? `
+                                <div class="bg-gradient-to-r from-${scoreColor}-500/20 to-${scoreColor}-600/10 border border-${scoreColor}-500/30 rounded-xl p-3 mb-3">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-bold text-${scoreColor}-300">${scoreEmoji} 表達評分</span>
+                                        <span class="text-2xl font-black text-${scoreColor}-400">${data.score}</span>
                                     </div>
-                                    <span class="text-xs font-bold">${data.score}</span>
-                                </div>` : ''}
+                                    <div class="h-2 bg-white/10 rounded-full overflow-hidden mb-2">
+                                        <div class="h-full bg-${scoreColor}-500 transition-all duration-500" style="width: ${data.score}%"></div>
+                                    </div>
+                                    ${data.scoreBreakdown ? `
+                                    <div class="grid grid-cols-4 gap-1 text-xs text-gray-400">
+                                        <div>文法 ${data.scoreBreakdown.grammar || '-'}</div>
+                                        <div>詞彙 ${data.scoreBreakdown.vocabulary || '-'}</div>
+                                        <div>自然 ${data.scoreBreakdown.naturalness || '-'}</div>
+                                        <div>完整 ${data.scoreBreakdown.completeness || '-'}</div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                ` : ''}
+                                
+                                <!-- 回饋建議 -->
+                                ${data.feedback ? `
+                                <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-3">
+                                    <p class="text-xs text-blue-300"><i class="fa-solid fa-comment-dots mr-1"></i>${data.feedback}</p>
+                                </div>
+                                ` : ''}
+                                
+                                <!-- 更好的說法 -->
+                                ${data.correction || data.betterWay ? `
+                                <div class="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 mb-3">
+                                    ${data.correction ? `<p class="text-xs text-red-300 mb-1"><i class="fa-solid fa-pen mr-1"></i>正確說法：<span class="text-white">${data.correction}</span></p>` : ''}
+                                    ${data.betterWay ? `<p class="text-xs text-purple-300"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>更自然：<span class="text-white">${data.betterWay}</span></p>` : ''}
+                                </div>
+                                ` : ''}
+                                
+                                <!-- 下一步建議 -->
+                                ${data.nextSuggestion ? `
+                                <div class="bg-gradient-to-r from-green-500/10 to-teal-500/10 rounded-lg p-3">
+                                    <p class="text-xs text-green-300 mb-1"><i class="fa-solid fa-arrow-right mr-1"></i>接下來可以說：</p>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-sm font-medium flex-1">${data.nextSuggestion}</p>
+                                        <button onclick="speakChatMessage(this, 0.7)" data-text="${safeNextSuggestion}" 
+                                            class="shrink-0 w-7 h-7 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 hover:bg-green-500/30 transition" title="播放">
+                                            <i class="fa-solid fa-play text-xs"></i>
+                                        </button>
+                                        <button onclick="document.getElementById('chat-input').value='${safeNextSuggestion}'" 
+                                            class="shrink-0 w-7 h-7 bg-teal-500/20 rounded-full flex items-center justify-center text-teal-400 hover:bg-teal-500/30 transition" title="填入">
+                                            <i class="fa-solid fa-paste text-xs"></i>
+                                        </button>
+                                    </div>
+                                    ${data.nextSuggestionChinese ? `<p class="text-xs text-gray-500 mt-1">${data.nextSuggestionChinese}</p>` : ''}
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
                     `;
@@ -3075,100 +3455,254 @@ If isChinese = false:
             loadContent();
         }
 
-        // ===== 語音輸入功能 =====
+        // ===== 語音輸入功能（優化版）=====
+        // 主要優化：
+        // 1. 即時音量視覺反饋（讓用戶知道麥克風正在接收）
+        // 2. 語音活動檢測 (VAD) - 自動判斷停止說話
+        // 3. 更好的錯誤處理和恢復機制
+        
         let recognition = null;
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
         let isListening = false;
         let recognitionTimeout = null;
         let currentTargetInput = null;
         let accumulatedTranscript = '';
-        let autoRestartChat = false;  // 標記是否應該自動重新開始聊天聆聽
+        let autoRestartChat = false;
+
+        // 語音活動檢測 (VAD) 配置
+        const VAD_CONFIG = {
+            silenceThreshold: 0.02,      // 靜音門檻 (0-1)
+            silenceTimeout: 2000,         // 靜音多久後結束 (ms)
+            minSpeechDuration: 300,       // 最小說話時間 (ms)
+            maxListenDuration: 30000,     // 最長聆聽時間 (ms)
+            smoothingFactor: 0.8          // 音量平滑係數
+        };
+
+        let silenceTimer = null;
+        let speechStartTime = null;
+        let lastVolumeLevel = 0;
+        let volumeUpdateInterval = null;
+
+        // ===== 初始化音訊分析器（用於視覺反饋和 VAD）=====
+        async function initAudioAnalyser() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,      // 回音消除
+                        noiseSuppression: true,       // 噪音抑制
+                        autoGainControl: true,        // 自動增益
+                    }
+                });
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.8;
+
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+
+                console.log('🎤 音訊分析器初始化成功');
+                return stream;
+            } catch (error) {
+                console.warn('音訊分析器初始化失敗:', error);
+                throw error;
+            }
+        }
+
+        // ===== 獲取當前音量級別 =====
+        function getVolumeLevel() {
+            if (!analyser) return 0;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length / 255;
+
+            lastVolumeLevel = lastVolumeLevel * VAD_CONFIG.smoothingFactor + 
+                              average * (1 - VAD_CONFIG.smoothingFactor);
+
+            return lastVolumeLevel;
+        }
+
+        // ===== 更新音量視覺反饋 =====
+        function updateVolumeIndicator(volume) {
+            const indicators = ['chat-volume-indicator', 'voice-volume-indicator'];
+            
+            indicators.forEach(id => {
+                const container = document.getElementById(id);
+                if (!container) return;
+                
+                const bars = container.querySelectorAll('.volume-bar');
+                const activeCount = Math.ceil(volume * bars.length * 3);
+
+                bars.forEach((bar, index) => {
+                    if (index < activeCount) {
+                        bar.style.transform = `scaleY(${0.3 + volume * 2})`;
+                        bar.style.opacity = '1';
+                        bar.style.backgroundColor = volume > 0.3 ? '#58cc02' : '#1cb0f6';
+                    } else {
+                        bar.style.transform = 'scaleY(0.3)';
+                        bar.style.opacity = '0.3';
+                        bar.style.backgroundColor = '#4a5568';
+                    }
+                });
+            });
+        }
+
+        // ===== 語音活動檢測 (VAD) =====
+        function startVAD() {
+            if (volumeUpdateInterval) {
+                clearInterval(volumeUpdateInterval);
+            }
+
+            speechStartTime = null;
+            silenceTimer = null;
+
+            volumeUpdateInterval = setInterval(() => {
+                if (!isListening) {
+                    clearInterval(volumeUpdateInterval);
+                    return;
+                }
+
+                const volume = getVolumeLevel();
+                updateVolumeIndicator(volume);
+
+                if (volume > VAD_CONFIG.silenceThreshold) {
+                    if (!speechStartTime) {
+                        speechStartTime = Date.now();
+                        console.log('🎙️ 偵測到語音開始');
+                    }
+                    
+                    if (silenceTimer) {
+                        clearTimeout(silenceTimer);
+                        silenceTimer = null;
+                    }
+                } else {
+                    if (speechStartTime && !silenceTimer) {
+                        const speechDuration = Date.now() - speechStartTime;
+                        
+                        if (speechDuration > VAD_CONFIG.minSpeechDuration) {
+                            console.log('🤫 偵測到靜音，開始倒計時...');
+                            silenceTimer = setTimeout(() => {
+                                if (isListening && recognition) {
+                                    console.log('⏱️ 靜音超時，自動結束聆聽');
+                                    recognition.stop();
+                                }
+                            }, VAD_CONFIG.silenceTimeout);
+                        }
+                    }
+                }
+            }, 50);
+        }
+
+        function stopVAD() {
+            if (volumeUpdateInterval) {
+                clearInterval(volumeUpdateInterval);
+                volumeUpdateInterval = null;
+            }
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
+            speechStartTime = null;
+            updateVolumeIndicator(0);
+        }
 
         function initSpeechRecognition(targetInputId) {
-            // 檢查瀏覽器是否支援語音辨識
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
             if (!SpeechRecognition) {
                 console.log('此瀏覽器不支援語音辨識');
-                // 隱藏麥克風按鈕
                 document.querySelectorAll('[id$="-mic-btn"]').forEach(btn => {
                     btn.style.display = 'none';
                 });
                 return false;
             }
 
-            // 如果已經有 recognition 實例且正在運行，先停止並清理
             if (recognition && isListening) {
                 try {
                     recognition.stop();
                 } catch (e) {
                     console.log('停止舊的 recognition:', e);
                 }
-                // 等待停止完成
                 setTimeout(() => {
                     initSpeechRecognition(targetInputId);
                 }, 300);
                 return true;
             }
 
-            // 每次創建新的 recognition 實例，確保乾淨的狀態
             recognition = new SpeechRecognition();
-            recognition.lang = 'ja-JP';  // 辨識日文
-            // 聊天模式使用連續模式，其他模式使用非連續模式
+            recognition.lang = 'ja-JP';
             recognition.continuous = (targetInputId === 'chat-input');
-            recognition.interimResults = true;  // 顯示即時結果
-            recognition.maxAlternatives = 3;  // 增加候選結果數量
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 3;
 
-            recognition.onstart = function() {
+            recognition.onstart = async function() {
                 isListening = true;
                 accumulatedTranscript = '';
                 updateMicButtonState(true);
                 
-                // 設置超時（15秒後自動停止，避免一直等待）
-                if (recognitionTimeout) {
-                    clearTimeout(recognitionTimeout);
+                // 初始化音訊分析器
+                if (!audioContext) {
+                    try {
+                        await initAudioAnalyser();
+                    } catch (e) {
+                        console.warn('音訊分析器初始化失敗，繼續使用基本識別');
+                    }
                 }
+
+                // 啟動 VAD
+                startVAD();
+
+                if (recognitionTimeout) clearTimeout(recognitionTimeout);
                 recognitionTimeout = setTimeout(() => {
                     if (isListening && recognition) {
                         recognition.stop();
                         showVoiceError('聆聽超時，請再試一次');
                     }
-                }, 15000);
+                }, VAD_CONFIG.maxListenDuration);
+                
+                console.log('🎤 語音識別已啟動');
             };
 
             recognition.onend = function() {
                 isListening = false;
                 updateMicButtonState(false);
+                stopVAD();
+                
                 if (recognitionTimeout) {
                     clearTimeout(recognitionTimeout);
                     recognitionTimeout = null;
                 }
                 
-                // 如果有累積的結果但還沒最終確認，使用最後的結果
                 if (currentTargetInput && accumulatedTranscript && !currentTargetInput.value.trim()) {
                     currentTargetInput.value = accumulatedTranscript.trim();
                     currentTargetInput.style.color = 'white';
                     playSound('correct');
                     
-                    // 如果是聊天模式且有內容，自動發送
                     if (currentTargetInput && currentTargetInput.id === 'chat-input' && accumulatedTranscript.trim()) {
                         setTimeout(() => {
                             sendChat();
-                            // 發送後自動重新開始聆聽
                             setTimeout(() => {
                                 if (APP_STATE.currentMode === 'chat' && autoRestartChat && !isListening) {
                                     startVoiceInput('chat-input');
                                 }
                             }, 800);
                         }, 300);
-                        return;  // 不繼續執行後面的自動重啟邏輯
+                        return;
                     }
                 }
                 
-                // 隱藏聆聽狀態
                 document.getElementById('chat-voice-status')?.classList.add('hidden');
                 document.getElementById('voice-status')?.classList.add('hidden');
                 
-                // 如果是聊天模式且應該自動重啟，則重新開始聆聽
                 if (autoRestartChat && currentTargetInput && currentTargetInput.id === 'chat-input' && APP_STATE.currentMode === 'chat' && !isListening) {
                     setTimeout(() => {
                         if (APP_STATE.currentMode === 'chat' && autoRestartChat && !isListening) {
@@ -3182,90 +3716,71 @@ If isChinese = false:
                 console.error('語音辨識錯誤:', event.error);
                 isListening = false;
                 updateMicButtonState(false);
+                stopVAD();
+                
                 if (recognitionTimeout) {
                     clearTimeout(recognitionTimeout);
                     recognitionTimeout = null;
                 }
                 
-                let errorMessage = '語音辨識發生錯誤';
+                const errorMessages = {
+                    'no-speech': '沒有偵測到聲音，請確認麥克風正常並靠近說話',
+                    'not-allowed': '請允許使用麥克風權限（點擊網址列左側的 🔒 圖示）',
+                    'network': '網路連線問題，語音識別需要網路連線',
+                    'service-not-allowed': '語音服務暫時不可用，請稍後再試',
+                    'audio-capture': '無法取得麥克風音訊，請檢查麥克風連接',
+                    'aborted': null
+                };
+
+                const message = errorMessages[event.error] || '語音辨識發生錯誤';
+                if (message) showVoiceError(message);
                 
-                if (event.error === 'no-speech') {
-                    errorMessage = '沒有偵測到聲音，請靠近麥克風再試一次';
-                } else if (event.error === 'not-allowed') {
-                    errorMessage = '請允許使用麥克風權限（檢查瀏覽器設定）';
-                } else if (event.error === 'network') {
-                    errorMessage = '網路連線問題，請檢查網路後再試';
-                } else if (event.error === 'service-not-allowed') {
-                    errorMessage = '語音服務不可用，請稍後再試';
-                } else if (event.error === 'aborted') {
-                    // 用戶主動停止，不顯示錯誤
-                    return;
-                } else if (event.error === 'audio-capture') {
-                    errorMessage = '無法取得麥克風音訊，請檢查麥克風設定';
-                }
-                
-                showVoiceError(errorMessage);
-                
-                // 隱藏聆聽狀態
                 document.getElementById('chat-voice-status')?.classList.add('hidden');
                 document.getElementById('voice-status')?.classList.add('hidden');
             };
 
             recognition.onnomatch = function() {
-                // 沒有匹配結果，但繼續聆聽
                 console.log('沒有匹配的語音結果，繼續聆聽...');
             };
 
-            // 設置 onresult 處理器
             recognition.onresult = function(event) {
                 let finalTranscript = '';
                 let interimTranscript = '';
 
-                // 處理所有結果
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const result = event.results[i];
                     const transcript = result[0].transcript;
                     const confidence = result[0].confidence || 0.5;
                     
                     if (result.isFinal) {
-                        // 只接受信心度較高的最終結果
                         if (confidence > 0.3) {
                             finalTranscript += transcript;
                             accumulatedTranscript += (accumulatedTranscript ? ' ' : '') + transcript;
                         }
                     } else {
-                        // 即時結果
                         interimTranscript = transcript;
                     }
                 }
 
-                // 即時顯示辨識結果
                 if (interimTranscript && currentTargetInput) {
                     const displayText = accumulatedTranscript ? 
                         accumulatedTranscript + ' ' + interimTranscript : 
                         interimTranscript;
                     currentTargetInput.value = displayText;
-                    currentTargetInput.style.color = '#94a3b8'; // 暫時結果用灰色
+                    currentTargetInput.style.color = '#94a3b8';
                 }
 
-                // 處理最終結果
                 if (finalTranscript && currentTargetInput) {
                     accumulatedTranscript = accumulatedTranscript.trim();
                     currentTargetInput.value = accumulatedTranscript;
                     currentTargetInput.style.color = 'white';
                     
-                    // 播放成功音效
                     playSound('correct');
                     
-                    // 如果是聊天模式，自動發送並繼續聆聽
                     if (targetInputId === 'chat-input' && accumulatedTranscript) {
-                        // 設置自動重啟標記
                         autoRestartChat = true;
-                        
-                        // 停止當前識別
                         recognition.stop();
                         
-                        // 短暫延遲後自動發送
                         setTimeout(() => {
                             if (currentTargetInput && currentTargetInput.value.trim()) {
                                 sendChat();
@@ -3279,15 +3794,13 @@ If isChinese = false:
         }
 
         function startVoiceInput(targetInputId) {
-            // 如果正在聆聽，先停止
             if (isListening && recognition) {
-                autoRestartChat = false;  // 手動停止時取消自動重啟
+                autoRestartChat = false;
                 try {
                     recognition.stop();
                 } catch (e) {
                     console.log('停止 recognition 時出錯:', e);
                 }
-                // 等待停止完成後再重新開始
                 setTimeout(() => startVoiceInput(targetInputId), 500);
                 return;
             }
@@ -3298,19 +3811,14 @@ If isChinese = false:
                 return;
             }
             
-            // 清空之前的結果
             accumulatedTranscript = '';
-            
-            // 設置自動重啟標記（僅聊天模式）
             autoRestartChat = (targetInputId === 'chat-input');
             
-            // 初始化或重新初始化語音識別
             if (!initSpeechRecognition(targetInputId)) {
                 alert('您的瀏覽器不支援語音輸入功能，請使用 Chrome 或 Edge 瀏覽器');
                 return;
             }
             
-            // 顯示聆聽狀態
             if (targetInputId === 'chat-input') {
                 document.getElementById('chat-voice-status')?.classList.remove('hidden');
             } else {
@@ -3322,7 +3830,6 @@ If isChinese = false:
             } catch (e) {
                 console.error('無法啟動語音辨識:', e);
                 if (e.message && e.message.includes('already started')) {
-                    // 如果已經在運行，先停止再重新開始
                     try {
                         recognition.stop();
                     } catch (e1) {
@@ -3347,13 +3854,12 @@ If isChinese = false:
             const micBtns = document.querySelectorAll('[id$="-mic-btn"]');
             micBtns.forEach(btn => {
                 if (listening) {
-                    btn.classList.add('animate-pulse', 'ring-4', 'ring-red-500/50');
+                    btn.classList.add('animate-pulse', 'ring-4', 'ring-red-500/50', 'listening');
                     btn.innerHTML = '<i class="fa-solid fa-stop text-xl"></i>';
                 } else {
-                    btn.classList.remove('animate-pulse', 'ring-4', 'ring-red-500/50');
+                    btn.classList.remove('animate-pulse', 'ring-4', 'ring-red-500/50', 'listening');
                     btn.innerHTML = '<i class="fa-solid fa-microphone text-xl"></i>';
                     
-                    // 隱藏所有聆聽狀態
                     document.getElementById('chat-voice-status')?.classList.add('hidden');
                     document.getElementById('voice-status')?.classList.add('hidden');
                 }
@@ -3361,12 +3867,11 @@ If isChinese = false:
         }
 
         function showVoiceError(message) {
-            // 簡單的錯誤提示
             const toast = document.createElement('div');
             toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg z-50 animate-slide';
             toast.innerHTML = `<i class="fa-solid fa-exclamation-circle mr-2"></i>${message}`;
             document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+            setTimeout(() => toast.remove(), 4000);
         }
 
         // 初始化語音辨識
