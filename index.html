@@ -1087,9 +1087,9 @@
                             <div class="p-4 border-t border-gray-200 bg-gray-50">
                                 <div class="flex gap-2">
                                     <!-- 語音輸入按鈕 -->
-                                    <button onclick="startVoiceInput('chat-input')" id="chat-mic-btn"
+                                    <button onclick="toggleChatVoiceInput()" id="chat-mic-btn"
                                         class="mic-btn-enhanced w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center hover:scale-110 transition shrink-0 text-white shadow-lg"
-                                        title="點擊開始說日文（說完會自動停止並發送）">
+                                        title="點擊開始/停止語音輸入">
                                         <i class="fa-solid fa-microphone text-lg"></i>
                                     </button>
                                     <input type="text" id="chat-input" 
@@ -4115,15 +4115,48 @@ If isChinese = false:
             return true;
         }
 
-        function startVoiceInput(targetInputId) {
+        // 停止語音輸入
+        function stopVoiceInput() {
             if (isListening && recognition) {
                 autoRestartChat = false;
+                isListening = false;
                 try {
                     recognition.stop();
                 } catch (e) {
                     console.log('停止 recognition 時出錯:', e);
                 }
-                setTimeout(() => startVoiceInput(targetInputId), 500);
+                updateMicButtonState(false);
+                stopVAD();
+                
+                // 如果有累積的文字，保留在輸入框中
+                if (currentTargetInput && accumulatedTranscript.trim()) {
+                    currentTargetInput.value = accumulatedTranscript.trim();
+                    currentTargetInput.style.color = 'white';
+                }
+                
+                document.getElementById('chat-voice-status')?.classList.add('hidden');
+                document.getElementById('voice-status')?.classList.add('hidden');
+                return true;
+            }
+            return false;
+        }
+
+        // AI對話模式的語音輸入切換
+        function toggleChatVoiceInput() {
+            if (isListening && currentTargetInput && currentTargetInput.id === 'chat-input') {
+                // 如果正在監聽，則停止
+                stopVoiceInput();
+            } else {
+                // 如果未在監聽，則開始
+                startVoiceInput('chat-input');
+            }
+        }
+
+        function startVoiceInput(targetInputId) {
+            // 如果已經在監聽，先停止
+            if (isListening && recognition) {
+                stopVoiceInput();
+                setTimeout(() => startVoiceInput(targetInputId), 300);
                 return;
             }
 
@@ -4177,13 +4210,27 @@ If isChinese = false:
             micBtns.forEach(btn => {
                 if (listening) {
                     btn.classList.add('animate-pulse', 'ring-4', 'ring-red-500/50', 'listening');
-                    btn.innerHTML = '<i class="fa-solid fa-stop text-xl"></i>';
+                    // 更新按鈕圖標和標題
+                    if (btn.id === 'chat-mic-btn') {
+                        btn.innerHTML = '<i class="fa-solid fa-stop text-xl"></i>';
+                        btn.title = '點擊停止語音輸入';
+                    } else {
+                        btn.innerHTML = '<i class="fa-solid fa-stop text-xl"></i>';
+                    }
                 } else {
                     btn.classList.remove('animate-pulse', 'ring-4', 'ring-red-500/50', 'listening');
-                    btn.innerHTML = '<i class="fa-solid fa-microphone text-xl"></i>';
+                    // 恢復按鈕圖標和標題
+                    if (btn.id === 'chat-mic-btn') {
+                        btn.innerHTML = '<i class="fa-solid fa-microphone text-lg"></i>';
+                        btn.title = '點擊開始語音輸入';
+                    } else {
+                        btn.innerHTML = '<i class="fa-solid fa-microphone text-xl"></i>';
+                    }
                     
-                    document.getElementById('chat-voice-status')?.classList.add('hidden');
-                    document.getElementById('voice-status')?.classList.add('hidden');
+                    // 只在非chat模式時隱藏狀態
+                    if (btn.id !== 'chat-mic-btn') {
+                        document.getElementById('voice-status')?.classList.add('hidden');
+                    }
                 }
             });
         }
