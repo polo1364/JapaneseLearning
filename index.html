@@ -377,6 +377,59 @@
             border-right: 8px solid transparent;
             border-top: 8px solid #8b5cf6;
         }
+
+        /* 導航選單樣式 */
+        .nav-menu-item {
+            font-weight: 600;
+            color: #475569;
+            transition: all 0.2s;
+        }
+        .nav-menu-item:hover {
+            color: #6366f1;
+        }
+        .nav-menu-item.active {
+            background: white;
+            color: #6366f1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* 推薦卡片 */
+        .recommend-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .recommend-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 文章卡片 */
+        .article-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .article-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        /* 確保按鈕可點擊 */
+        button {
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
     </style>
 </head>
 <body class="text-gray-800 overflow-hidden">
@@ -403,59 +456,124 @@
     <!-- 主畫面 -->
     <div class="h-screen flex flex-col">
         <!-- 頂部導航 -->
-        <header class="glass-card border-b border-gray-200/50 px-4 py-4 shadow-lg">
-            <div class="max-w-6xl mx-auto flex items-center justify-between">
-                <div class="flex items-center gap-3 md:gap-6">
-                    <!-- 手機版選單按鈕 -->
-                    <button onclick="toggleMobileMenu()" class="lg:hidden w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center text-white shadow-md hover:shadow-lg transition">
-                        <i class="fa-solid fa-bars text-lg"></i>
-            </button>
+        <header class="glass-card border-b border-gray-200/50 shadow-lg">
+            <!-- 第一層：Logo 和主要功能 -->
+            <div class="px-4 py-3 border-b border-gray-200/50">
+                <div class="max-w-7xl mx-auto flex items-center justify-between">
+                    <div class="flex items-center gap-4 md:gap-6">
+                        <!-- 手機版選單按鈕 -->
+                        <button onclick="toggleMobileMenu()" class="lg:hidden w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center text-white shadow-md hover:shadow-lg transition">
+                            <i class="fa-solid fa-bars text-lg"></i>
+                        </button>
 
-                    <h1 class="text-lg md:text-xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                        LinguaMax
-                    </h1>
-                    
-                    <!-- 連續天數 -->
-                    <div class="hidden sm:flex items-center gap-2 bg-gradient-to-r from-orange-400 to-red-400 px-4 py-2 rounded-full text-white shadow-md">
-                        <i class="fa-solid fa-fire streak-fire"></i>
-                        <span id="streak-count" class="font-bold">0</span>
-        </div>
-
-                    <!-- XP -->
-                    <div class="flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-amber-400 px-4 py-2 rounded-full text-white shadow-md">
-                        <i class="fa-solid fa-star"></i>
-                        <span id="xp-count" class="font-bold">0 XP</span>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-4">
-                    <!-- 等級選擇 -->
-                    <div class="relative">
-                        <label class="text-xs text-gray-600 absolute -top-5 left-0 font-semibold">難度等級</label>
-                        <select id="level-select" onchange="onLevelChange()" class="bg-white border-2 border-gray-300 rounded-xl px-4 py-2.5 text-base font-semibold cursor-pointer hover:border-indigo-500 transition min-w-[200px] shadow-sm">
-                            <option value="N5" selected>🌱 入門 (N5)</option>
-                            <option value="N4">🌿 初級 (N4)</option>
-                            <option value="N3">🌳 中級 (N3)</option>
-                            <option value="N2">🌲 中高級 (N2)</option>
-                            <option value="N1">🏔️ 進階 (N1)</option>
-                            <option value="SURVIVAL">🧭 旅日生存</option>
-                            <option value="TRAVEL_PLUS">✈️ 旅遊進階</option>
-                            <option value="BIZ_KEIGO">💼 職場敬語</option>
-                            <option value="CASUAL">🗣️ 日常俗語</option>
-                            <option value="IT_DEV">👩‍💻 IT / 工程</option>
-                            <option value="KANA_HIRA">🈁 平假名入門</option>
-                            <option value="KANA_KATA">🈂️ 片假名入門</option>
-                            <option value="CONVO">💬 會話優先</option>
-                    </select>
+                        <h1 class="text-xl md:text-2xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent cursor-pointer" onclick="showHomePage()">
+                            時雨
+                        </h1>
+                        
+                        <!-- 搜尋框 -->
+                        <div class="hidden md:flex items-center relative flex-1 max-w-md">
+                            <input type="text" id="search-input" placeholder="搜尋單字、文法..." 
+                                class="w-full bg-white border-2 border-gray-300 rounded-xl px-4 py-2.5 pl-12 text-base focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-200 transition shadow-sm">
+                            <i class="fa-solid fa-search absolute left-4 text-gray-400"></i>
+                            <div id="search-results" class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 hidden z-50 max-h-96 overflow-y-auto"></div>
+                        </div>
                     </div>
 
-                    <!-- 個人資料 -->
-                    <button onclick="openStats()" class="w-11 h-11 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center font-bold hover:scale-105 transition shadow-lg hover:shadow-xl text-white" title="學習統計">
-                        <i class="fa-solid fa-chart-line text-lg"></i>
-                </button>
+                    <div class="flex items-center gap-3">
+                        <!-- 移動端搜尋按鈕 -->
+                        <button onclick="toggleMobileSearch()" class="md:hidden w-10 h-10 bg-white border-2 border-gray-300 rounded-xl flex items-center justify-center text-gray-600 hover:border-indigo-500 transition shadow-sm">
+                            <i class="fa-solid fa-search"></i>
+                        </button>
+
+                        <!-- 等級選擇 (僅在學習模式顯示) -->
+                        <div id="level-select-container" class="relative hidden">
+                            <label class="text-xs text-gray-600 absolute -top-5 left-0 font-semibold">難度等級</label>
+                            <select id="level-select" onchange="onLevelChange()" class="bg-white border-2 border-gray-300 rounded-xl px-4 py-2.5 text-base font-semibold cursor-pointer hover:border-indigo-500 transition min-w-[200px] shadow-sm">
+                                <option value="N5" selected>🌱 入門 (N5)</option>
+                                <option value="N4">🌿 初級 (N4)</option>
+                                <option value="N3">🌳 中級 (N3)</option>
+                                <option value="N2">🌲 中高級 (N2)</option>
+                                <option value="N1">🏔️ 進階 (N1)</option>
+                                <option value="SURVIVAL">🧭 旅日生存</option>
+                                <option value="TRAVEL_PLUS">✈️ 旅遊進階</option>
+                                <option value="BIZ_KEIGO">💼 職場敬語</option>
+                                <option value="CASUAL">🗣️ 日常俗語</option>
+                                <option value="IT_DEV">👩‍💻 IT / 工程</option>
+                                <option value="KANA_HIRA">🈁 平假名入門</option>
+                                <option value="KANA_KATA">🈂️ 片假名入門</option>
+                                <option value="CONVO">💬 會話優先</option>
+                            </select>
+                        </div>
+
+                        <!-- 連續天數 -->
+                        <div class="hidden sm:flex items-center gap-2 bg-gradient-to-r from-orange-400 to-red-400 px-3 py-1.5 rounded-full text-white shadow-md text-sm">
+                            <i class="fa-solid fa-fire streak-fire"></i>
+                            <span id="streak-count" class="font-bold">0</span>
+                        </div>
+
+                        <!-- XP -->
+                        <div class="flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-amber-400 px-3 py-1.5 rounded-full text-white shadow-md text-sm">
+                            <i class="fa-solid fa-star"></i>
+                            <span id="xp-count" class="font-bold">0 XP</span>
+                        </div>
+
+                        <!-- 個人資料 -->
+                        <button onclick="openStats()" class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center font-bold hover:scale-105 transition shadow-lg hover:shadow-xl text-white" title="學習統計">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            <!-- 第二層：主要導航選單 -->
+            <nav class="px-4 py-2 bg-gray-50/50">
+                <div class="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto hide-scrollbar">
+                    <button onclick="showHomePage(); updateNavActive(this);" class="nav-menu-item px-4 py-2 rounded-lg hover:bg-white transition whitespace-nowrap active">
+                        <i class="fa-solid fa-home mr-2"></i>首頁
+                    </button>
+                    <button onclick="showPracticeCenter(); updateNavActive(this);" class="nav-menu-item px-4 py-2 rounded-lg hover:bg-white transition whitespace-nowrap">
+                        <i class="fa-solid fa-dumbbell mr-2"></i>練習機
+                    </button>
+                    <button onclick="showLearningCenter(); updateNavActive(this);" class="nav-menu-item px-4 py-2 rounded-lg hover:bg-white transition whitespace-nowrap">
+                        <i class="fa-solid fa-book mr-2"></i>學習
+                    </button>
+                    <button onclick="showTestCenter(); updateNavActive(this);" class="nav-menu-item px-4 py-2 rounded-lg hover:bg-white transition whitespace-nowrap">
+                        <i class="fa-solid fa-clipboard-check mr-2"></i>測驗
+                    </button>
+                    <button onclick="showDictionary(); updateNavActive(this);" class="nav-menu-item px-4 py-2 rounded-lg hover:bg-white transition whitespace-nowrap">
+                        <i class="fa-solid fa-book-open mr-2"></i>辭典
+                    </button>
+                    <div class="relative group">
+                        <button class="nav-menu-item px-4 py-2 rounded-lg hover:bg-white transition whitespace-nowrap">
+                            <i class="fa-solid fa-chevron-down mr-2 text-xs"></i>更多
+                        </button>
+                        <div class="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 hidden group-hover:block z-50 min-w-[200px]">
+                            <a href="#" class="block px-4 py-2 hover:bg-gray-50 rounded-lg transition">升級VIP</a>
+                            <a href="#" class="block px-4 py-2 hover:bg-gray-50 rounded-lg transition">設定</a>
+                            <a href="#" class="block px-4 py-2 hover:bg-gray-50 rounded-lg transition">關於</a>
+                        </div>
+                    </div>
+                </div>
+            </nav>
         </header>
+
+        <!-- 移動端搜尋模態框 -->
+        <div id="mobile-search-modal" class="fixed inset-0 z-50 hidden lg:hidden">
+            <div class="absolute inset-0 bg-black/60" onclick="toggleMobileSearch()"></div>
+            <div class="absolute top-0 left-0 right-0 glass-card border-b border-gray-200/50 p-4 animate-slide">
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 relative">
+                        <input type="text" id="mobile-search-input" placeholder="搜尋單字、文法..." 
+                            class="w-full bg-white border-2 border-gray-300 rounded-xl px-4 py-3 pl-12 text-base focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-200 transition shadow-sm">
+                        <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <div id="mobile-search-results" class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 hidden z-50 max-h-96 overflow-y-auto"></div>
+                    </div>
+                    <button onclick="toggleMobileSearch()" class="w-12 h-12 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center text-gray-600 transition">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- 手機版選單 (覆蓋層) -->
         <div id="mobile-menu" class="fixed inset-0 z-40 hidden lg:hidden">
@@ -463,7 +581,7 @@
             <aside class="absolute left-0 top-0 bottom-0 w-72 glass-card border-r border-gray-200/50 p-4 overflow-y-auto hide-scrollbar animate-slide shadow-2xl">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-sm font-bold text-gray-600 flex items-center gap-2">
-                        <i class="fa-solid fa-book-open text-indigo-600"></i> 選擇學習模式
+                        <i class="fa-solid fa-book-open text-indigo-600"></i> 選單
                     </h3>
                     <button onclick="toggleMobileMenu()" class="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center text-gray-600 transition">
                         <i class="fa-solid fa-times"></i>
@@ -471,6 +589,15 @@
             </div>
 
                 <nav class="space-y-2" id="mobile-mode-nav">
+                    <button onclick="showHomePage(); toggleMobileMenu();" 
+                        class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-indigo-50 border-2 border-transparent transition shadow-sm">
+                        <i class="fa-solid fa-home text-xl text-indigo-500"></i>
+                        <div class="text-left">
+                            <div class="font-bold text-gray-800">首頁</div>
+                            <div class="text-xs text-gray-700 font-medium">返回首頁</div>
+                        </div>
+                    </button>
+                    <hr class="border-gray-200 my-2">
                     <button onclick="switchMode('kana'); toggleMobileMenu();" data-mode="kana" 
                         class="mobile-mode-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-indigo-50 border-2 border-transparent transition shadow-sm">
                         <i class="fa-solid fa-language text-xl text-emerald-500"></i>
@@ -665,7 +792,393 @@
 
             <!-- 主學習區 -->
             <main class="flex-1 overflow-y-auto hide-scrollbar p-6">
-                <div class="max-w-3xl mx-auto">
+                <!-- 首頁視圖 -->
+                <div id="home-page" class="max-w-7xl mx-auto">
+                    <!-- 推薦學習 -->
+                    <section class="mb-8">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-2xl font-black text-gray-900">推薦學習</h2>
+                            <button onclick="switchMode('flashcard')" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 cursor-pointer">查看更多 <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="recommend-card" onclick="switchMode('kana')">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center text-white text-xl">
+                                        <i class="fa-solid fa-language"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-lg text-gray-900">五十音練習機</h3>
+                                        <p class="text-sm text-gray-600">基礎入門</p>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-700 mb-3">五十音完全掌握</p>
+                                <div class="flex items-center justify-between text-xs text-gray-500">
+                                    <span><i class="fa-solid fa-list mr-1"></i>6種練習</span>
+                                    <span><i class="fa-solid fa-users mr-1"></i>18萬+</span>
+                                </div>
+                            </div>
+                            <div class="recommend-card" onclick="switchMode('grammar')">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center text-white text-xl">
+                                        <i class="fa-solid fa-spell-check"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-lg text-gray-900">動詞變化練習機</h3>
+                                        <p class="text-sm text-gray-600">初級必練</p>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-700 mb-3">動詞變化：て形、た形...</p>
+                                <div class="flex items-center justify-between text-xs text-gray-500">
+                                    <span><i class="fa-solid fa-list mr-1"></i>11種變化</span>
+                                    <span><i class="fa-solid fa-users mr-1"></i>5萬+</span>
+                                </div>
+                            </div>
+                            <div class="recommend-card" onclick="switchMode('flashcard')">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xl">
+                                        <i class="fa-solid fa-clone"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-lg text-gray-900">N3 中級課程</h3>
+                                        <p class="text-sm text-gray-600">N5 N4 N3</p>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-700 mb-3">單字 不斷練習、加強記憶</p>
+                                <div class="flex items-center justify-between text-xs text-gray-500">
+                                    <span><i class="fa-solid fa-list mr-1"></i>65課</span>
+                                    <span><i class="fa-solid fa-users mr-1"></i>34萬+</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 最新文章 -->
+                    <section class="mb-8">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-2xl font-black text-gray-900">最新文章</h2>
+                            <button onclick="switchMode('grammar')" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 cursor-pointer">查看更多 <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="article-card">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full font-semibold">測驗</span>
+                                    <span class="text-xs text-gray-500">N3文法103</span>
+                                </div>
+                                <h3 class="font-bold text-lg text-gray-900 mb-2">「ふりをする」裝作～的樣子</h3>
+                                <p class="text-sm text-gray-600 mb-3">是非題，請選擇以下句子是否正確，並思考該句子對、錯的原因。</p>
+                                <div class="text-xs text-gray-400">2025-12-24</div>
+                            </div>
+                            <div class="article-card">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full font-semibold">測驗</span>
+                                    <span class="text-xs text-gray-500">N3文法102</span>
+                                </div>
+                                <h3 class="font-bold text-lg text-gray-900 mb-2">「ぶり」時隔／樣子</h3>
+                                <p class="text-sm text-gray-600 mb-3">是非題，請選擇以下句子是否正確，並思考該句子對、錯的原因。</p>
+                                <div class="text-xs text-gray-400">2025-12-23</div>
+                            </div>
+                            <div class="article-card">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full font-semibold">測驗</span>
+                                    <span class="text-xs text-gray-500">N3文法101</span>
+                                </div>
+                                <h3 class="font-bold text-lg text-gray-900 mb-2">「反面」另一方面、相反</h3>
+                                <p class="text-sm text-gray-600 mb-3">是非題，請選擇以下句子是否正確，並思考該句子對、錯的原因。</p>
+                                <div class="text-xs text-gray-400">2025-12-22</div>
+                            </div>
+                            <div class="article-card">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full font-semibold">測驗</span>
+                                    <span class="text-xs text-gray-500">N3文法100</span>
+                                </div>
+                                <h3 class="font-bold text-lg text-gray-900 mb-2">「はもちろん／はもとより」不用說、當然</h3>
+                                <p class="text-sm text-gray-600 mb-3">句子重組，請依照正確句子順序排序，將★的位置填入正確的選項。</p>
+                                <div class="text-xs text-gray-400">2025-12-18</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 快速入口 -->
+                    <section>
+                        <h2 class="text-2xl font-black text-gray-900 mb-4">快速入口</h2>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <button onclick="switchMode('flashcard')" class="glass-card rounded-xl p-4 text-center hover:scale-105 transition shadow-md">
+                                <div class="w-12 h-12 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xl mx-auto mb-2">
+                                    <i class="fa-solid fa-clone"></i>
+                                </div>
+                                <div class="font-bold text-gray-900">單字閃卡</div>
+                            </button>
+                            <button onclick="switchMode('quiz')" class="glass-card rounded-xl p-4 text-center hover:scale-105 transition shadow-md">
+                                <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center text-white text-xl mx-auto mb-2">
+                                    <i class="fa-solid fa-circle-question"></i>
+                                </div>
+                                <div class="font-bold text-gray-900">選擇題測驗</div>
+                            </button>
+                            <button onclick="switchMode('grammar')" class="glass-card rounded-xl p-4 text-center hover:scale-105 transition shadow-md">
+                                <div class="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center text-white text-xl mx-auto mb-2">
+                                    <i class="fa-solid fa-spell-check"></i>
+                                </div>
+                                <div class="font-bold text-gray-900">文法闖關</div>
+                            </button>
+                            <button onclick="switchMode('chat')" class="glass-card rounded-xl p-4 text-center hover:scale-105 transition shadow-md">
+                                <div class="w-12 h-12 bg-gradient-to-br from-pink-400 to-pink-600 rounded-xl flex items-center justify-center text-white text-xl mx-auto mb-2">
+                                    <i class="fa-solid fa-comments"></i>
+                                </div>
+                                <div class="font-bold text-gray-900">AI 對話</div>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- 練習機頁面 -->
+                <div id="practice-center-page" class="max-w-7xl mx-auto hidden">
+                    <div class="mb-6">
+                        <h1 class="text-3xl font-black text-gray-900 mb-2">練習機</h1>
+                        <p class="text-gray-600">選擇練習模式，開始強化你的日語能力</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="glass-card rounded-2xl p-6 cursor-pointer hover:scale-105 transition shadow-lg" onclick="switchMode('kana')">
+                            <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center text-white text-2xl mb-4">
+                                <i class="fa-solid fa-language"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">五十音練習機</h3>
+                            <p class="text-sm text-gray-600 mb-4">平假名、片假名基礎練習</p>
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span><i class="fa-solid fa-list mr-1"></i>6種練習</span>
+                                <span><i class="fa-solid fa-users mr-1"></i>18萬+</span>
+                            </div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 cursor-pointer hover:scale-105 transition shadow-lg" onclick="switchMode('flashcard')">
+                            <div class="w-16 h-16 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-xl flex items-center justify-center text-white text-2xl mb-4">
+                                <i class="fa-solid fa-clone"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">單字閃卡</h3>
+                            <p class="text-sm text-gray-600 mb-4">翻轉卡片記憶單字</p>
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span><i class="fa-solid fa-book mr-1"></i>多種主題</span>
+                            </div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 cursor-pointer hover:scale-105 transition shadow-lg" onclick="switchMode('typing')">
+                            <div class="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center text-white text-2xl mb-4">
+                                <i class="fa-solid fa-keyboard"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">拼寫練習</h3>
+                            <p class="text-sm text-gray-600 mb-4">打字練習記憶單字</p>
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span><i class="fa-solid fa-keyboard mr-1"></i>打字練習</span>
+                            </div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 cursor-pointer hover:scale-105 transition shadow-lg" onclick="switchMode('listening')">
+                            <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-xl flex items-center justify-center text-white text-2xl mb-4">
+                                <i class="fa-solid fa-headphones"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">聽力訓練</h3>
+                            <p class="text-sm text-gray-600 mb-4">聽音辨義練習</p>
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span><i class="fa-solid fa-volume-high mr-1"></i>聽力練習</span>
+                            </div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 cursor-pointer hover:scale-105 transition shadow-lg" onclick="switchMode('grammar')">
+                            <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center text-white text-2xl mb-4">
+                                <i class="fa-solid fa-spell-check"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">動詞變化練習</h3>
+                            <p class="text-sm text-gray-600 mb-4">動詞變化：て形、た形...</p>
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span><i class="fa-solid fa-list mr-1"></i>11種變化</span>
+                            </div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 cursor-pointer hover:scale-105 transition shadow-lg" onclick="switchMode('quiz')">
+                            <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center text-white text-2xl mb-4">
+                                <i class="fa-solid fa-circle-question"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">選擇題測驗</h3>
+                            <p class="text-sm text-gray-600 mb-4">四選一快速練習</p>
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span><i class="fa-solid fa-check-circle mr-1"></i>即時反饋</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 學習中心頁面 -->
+                <div id="learning-center-page" class="max-w-7xl mx-auto hidden">
+                    <div class="mb-6">
+                        <h1 class="text-3xl font-black text-gray-900 mb-2">學習中心</h1>
+                        <p class="text-gray-600">系統化學習日語，從基礎到進階</p>
+                    </div>
+                    <div class="space-y-6">
+                        <!-- 基礎入門 -->
+                        <section class="glass-card rounded-2xl p-6 shadow-lg">
+                            <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-seedling text-emerald-500"></i>基礎入門
+                            </h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-400 transition cursor-pointer" onclick="switchMode('kana')">
+                                    <h3 class="font-bold text-lg text-gray-900 mb-2">日語50音系列</h3>
+                                    <p class="text-sm text-gray-600">學習平假名、片假名</p>
+                                </div>
+                                <div class="border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-400 transition cursor-pointer" onclick="switchMode('flashcard')">
+                                    <h3 class="font-bold text-lg text-gray-900 mb-2">認識日語發音</h3>
+                                    <p class="text-sm text-gray-600">基礎發音練習</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- 日文單字 -->
+                        <section class="glass-card rounded-2xl p-6 shadow-lg">
+                            <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-book text-indigo-500"></i>日文單字
+                            </h2>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                <button onclick="switchMode('flashcard'); document.getElementById('level-select').value='N5'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-green-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌱</div>
+                                    <div class="font-bold text-gray-900">N5初級單字</div>
+                                </button>
+                                <button onclick="switchMode('flashcard'); document.getElementById('level-select').value='N4'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-green-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌿</div>
+                                    <div class="font-bold text-gray-900">N4進階單字</div>
+                                </button>
+                                <button onclick="switchMode('flashcard'); document.getElementById('level-select').value='N3'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-green-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌳</div>
+                                    <div class="font-bold text-gray-900">N3中級單字</div>
+                                </button>
+                                <button onclick="switchMode('flashcard'); document.getElementById('level-select').value='N2'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-green-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌲</div>
+                                    <div class="font-bold text-gray-900">N2中上單字</div>
+                                </button>
+                                <button onclick="switchMode('flashcard'); document.getElementById('level-select').value='N1'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-green-400 transition text-center">
+                                    <div class="text-2xl mb-2">🏔️</div>
+                                    <div class="font-bold text-gray-900">N1上級單字</div>
+                                </button>
+                            </div>
+                        </section>
+
+                        <!-- 日文文法 -->
+                        <section class="glass-card rounded-2xl p-6 shadow-lg">
+                            <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-spell-check text-amber-500"></i>日文文法
+                            </h2>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N5'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌱</div>
+                                    <div class="font-bold text-gray-900">N5初級文法</div>
+                                </button>
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N4'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌿</div>
+                                    <div class="font-bold text-gray-900">N4進階文法</div>
+                                </button>
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N3'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌳</div>
+                                    <div class="font-bold text-gray-900">N3中級文法</div>
+                                </button>
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N2'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌲</div>
+                                    <div class="font-bold text-gray-900">N2中上文法</div>
+                                </button>
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N1'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🏔️</div>
+                                    <div class="font-bold text-gray-900">N1上級文法</div>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- 測驗中心頁面 -->
+                <div id="test-center-page" class="max-w-7xl mx-auto hidden">
+                    <div class="mb-6">
+                        <h1 class="text-3xl font-black text-gray-900 mb-2">測驗中心</h1>
+                        <p class="text-gray-600">檢驗你的學習成果，挑戰不同難度</p>
+                    </div>
+                    <div class="space-y-6">
+                        <!-- 單字測驗 -->
+                        <section class="glass-card rounded-2xl p-6 shadow-lg">
+                            <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-book text-indigo-500"></i>單字測驗
+                            </h2>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                <button onclick="switchMode('quiz'); document.getElementById('level-select').value='N5'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌱</div>
+                                    <div class="font-bold text-gray-900">N5單字測驗</div>
+                                </button>
+                                <button onclick="switchMode('quiz'); document.getElementById('level-select').value='N4'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌿</div>
+                                    <div class="font-bold text-gray-900">N4單字測驗</div>
+                                </button>
+                                <button onclick="switchMode('quiz'); document.getElementById('level-select').value='N3'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌳</div>
+                                    <div class="font-bold text-gray-900">N3單字測驗</div>
+                                </button>
+                                <button onclick="switchMode('quiz'); document.getElementById('level-select').value='N2'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌲</div>
+                                    <div class="font-bold text-gray-900">N2單字測驗</div>
+                                </button>
+                                <button onclick="switchMode('quiz'); document.getElementById('level-select').value='N1'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-400 transition text-center">
+                                    <div class="text-2xl mb-2">🏔️</div>
+                                    <div class="font-bold text-gray-900">N1單字測驗</div>
+                                </button>
+                            </div>
+                        </section>
+
+                        <!-- 文法測驗 -->
+                        <section class="glass-card rounded-2xl p-6 shadow-lg">
+                            <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-spell-check text-amber-500"></i>文法測驗
+                            </h2>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N5'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌱</div>
+                                    <div class="font-bold text-gray-900">N5文法測驗</div>
+                                </button>
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N4'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌿</div>
+                                    <div class="font-bold text-gray-900">N4文法測驗</div>
+                                </button>
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N3'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌳</div>
+                                    <div class="font-bold text-gray-900">N3文法測驗</div>
+                                </button>
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N2'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🌲</div>
+                                    <div class="font-bold text-gray-900">N2文法測驗</div>
+                                </button>
+                                <button onclick="switchMode('grammar'); document.getElementById('level-select').value='N1'; onLevelChange();" class="border-2 border-gray-200 rounded-xl p-4 hover:border-amber-400 transition text-center">
+                                    <div class="text-2xl mb-2">🏔️</div>
+                                    <div class="font-bold text-gray-900">N1文法測驗</div>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- 辭典頁面 -->
+                <div id="dictionary-page" class="max-w-7xl mx-auto hidden">
+                    <div class="mb-6">
+                        <h1 class="text-3xl font-black text-gray-900 mb-2">辭典</h1>
+                        <p class="text-gray-600">查詢日語單字、文法，快速查找學習資源</p>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 shadow-lg">
+                        <div class="mb-6">
+                            <div class="flex items-center gap-4 mb-4">
+                                <input type="text" id="dictionary-search" placeholder="輸入日語單字或中文..." 
+                                    class="flex-1 bg-white border-2 border-gray-300 rounded-xl px-4 py-3 text-base focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-200 transition shadow-sm">
+                                <button onclick="searchDictionary()" class="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-semibold hover:from-indigo-600 hover:to-purple-600 transition shadow-md">
+                                    <i class="fa-solid fa-search mr-2"></i>搜尋
+                                </button>
+                            </div>
+                        </div>
+                        <div id="dictionary-results" class="space-y-4">
+                            <div class="text-center text-gray-500 py-12">
+                                <i class="fa-solid fa-book-open text-4xl mb-4"></i>
+                                <p>在搜尋框中輸入單字開始查詢</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 學習模式視圖 -->
+                <div id="learning-mode-view" class="max-w-3xl mx-auto hidden">
                     
                     <!-- 載入中 -->
                     <div id="loading" class="hidden fixed inset-0 bg-black/50 z-40 flex items-center justify-center">
@@ -1124,8 +1637,9 @@
                         </div>
                     </div>
 
-        </div>
-    </main>
+                </div>
+            </div>
+        </main>
         </div>
     </div>
 
@@ -1651,8 +2165,9 @@
         function initApp() {
             loadUserData();
             updateTopics();
-            loadContent();
             checkStreak();
+            // 只有在學習模式下才載入內容
+            // loadContent() 會在 switchMode() 時被調用
         }
 
         // ===== 用戶數據 =====
@@ -1833,8 +2348,198 @@
             setTimeout(() => popup.remove(), 1500);
         }
 
+        // ===== 頁面切換 =====
+        function showHomePage() {
+            hideAllPages();
+            document.getElementById('home-page').classList.remove('hidden');
+            document.getElementById('learning-mode-view').classList.add('hidden');
+            // 隱藏等級選擇器
+            const levelContainer = document.getElementById('level-select-container');
+            if (levelContainer) levelContainer.classList.add('hidden');
+            // 更新導航狀態
+            document.querySelectorAll('.nav-menu-item').forEach(btn => btn.classList.remove('active'));
+            // 設置首頁按鈕為活動狀態
+            const homeBtn = document.querySelector('.nav-menu-item');
+            if (homeBtn) homeBtn.classList.add('active');
+        }
+
+        function showPracticeCenter(button) {
+            hideAllPages();
+            document.getElementById('practice-center-page').classList.remove('hidden');
+            document.getElementById('learning-mode-view').classList.add('hidden');
+            const levelContainer = document.getElementById('level-select-container');
+            if (levelContainer) levelContainer.classList.add('hidden');
+            if (button) updateNavActive(button);
+        }
+
+        function showLearningCenter(button) {
+            hideAllPages();
+            document.getElementById('learning-center-page').classList.remove('hidden');
+            document.getElementById('learning-mode-view').classList.add('hidden');
+            const levelContainer = document.getElementById('level-select-container');
+            if (levelContainer) levelContainer.classList.add('hidden');
+            if (button) updateNavActive(button);
+        }
+
+        function showTestCenter(button) {
+            hideAllPages();
+            document.getElementById('test-center-page').classList.remove('hidden');
+            document.getElementById('learning-mode-view').classList.add('hidden');
+            const levelContainer = document.getElementById('level-select-container');
+            if (levelContainer) levelContainer.classList.add('hidden');
+            if (button) updateNavActive(button);
+        }
+
+        function showDictionary(button) {
+            hideAllPages();
+            document.getElementById('dictionary-page').classList.remove('hidden');
+            document.getElementById('learning-mode-view').classList.add('hidden');
+            const levelContainer = document.getElementById('level-select-container');
+            if (levelContainer) levelContainer.classList.add('hidden');
+            if (button) updateNavActive(button);
+        }
+
+        function hideAllPages() {
+            document.getElementById('home-page').classList.add('hidden');
+            document.getElementById('practice-center-page').classList.add('hidden');
+            document.getElementById('learning-center-page').classList.add('hidden');
+            document.getElementById('test-center-page').classList.add('hidden');
+            document.getElementById('dictionary-page').classList.add('hidden');
+        }
+
+        // 辭典搜尋功能
+        async function searchDictionary() {
+            const searchInput = document.getElementById('dictionary-search');
+            const resultsContainer = document.getElementById('dictionary-results');
+            
+            if (!searchInput || !resultsContainer) return;
+            
+            const query = searchInput.value.trim();
+            if (!query) {
+                resultsContainer.innerHTML = `
+                    <div class="text-center text-gray-500 py-12">
+                        <i class="fa-solid fa-book-open text-4xl mb-4"></i>
+                        <p>在搜尋框中輸入單字開始查詢</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 顯示載入中
+            resultsContainer.innerHTML = `
+                <div class="text-center text-gray-500 py-12">
+                    <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p>正在搜尋...</p>
+                </div>
+            `;
+
+            try {
+                // 使用 AI 生成單字解釋
+                const levelSelect = document.getElementById('level-select');
+                const level = levelSelect ? levelSelect.value : 'N5';
+                
+                const prompt = `請為我解釋這個日語單字或詞組：${query}
+
+請用 JSON 格式回傳，包含以下欄位：
+{
+  "word": "單字（日文）",
+  "kana": "假名",
+  "romaji": "羅馬音",
+  "meaning": "中文意思",
+  "examples": ["例句1（日文）", "例句2（日文）"],
+  "examples_meaning": ["例句1（中文）", "例句2（中文）"],
+  "grammar": "文法說明（如果有）",
+  "level": "難度等級（N5-N1）"
+}`;
+
+                const data = await callGeminiAPI(prompt);
+                
+                if (data.word) {
+                    resultsContainer.innerHTML = `
+                        <div class="glass-card rounded-2xl p-6 shadow-lg">
+                            <div class="mb-4">
+                                <h2 class="text-3xl font-black text-gray-900 mb-2">${data.word}</h2>
+                                ${data.kana ? `<p class="text-xl text-indigo-600 font-semibold mb-1">${data.kana}</p>` : ''}
+                                ${data.romaji ? `<p class="text-sm text-gray-500">${data.romaji}</p>` : ''}
+                            </div>
+                            <div class="mb-4">
+                                <h3 class="text-lg font-bold text-gray-900 mb-2">意思</h3>
+                                <p class="text-gray-700">${data.meaning || '無資料'}</p>
+                            </div>
+                            ${data.examples && data.examples.length > 0 ? `
+                                <div class="mb-4">
+                                    <h3 class="text-lg font-bold text-gray-900 mb-2">例句</h3>
+                                    <div class="space-y-2">
+                                        ${data.examples.map((ex, idx) => `
+                                            <div class="bg-gray-50 rounded-lg p-3">
+                                                <p class="text-gray-900 font-semibold mb-1">${ex}</p>
+                                                ${data.examples_meaning && data.examples_meaning[idx] ? `<p class="text-sm text-gray-600">${data.examples_meaning[idx]}</p>` : ''}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${data.grammar ? `
+                                <div class="mb-4">
+                                    <h3 class="text-lg font-bold text-gray-900 mb-2">文法說明</h3>
+                                    <p class="text-gray-700">${data.grammar}</p>
+                                </div>
+                            ` : ''}
+                            ${data.level ? `
+                                <div class="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-semibold">
+                                    難度：${data.level}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                } else {
+                    resultsContainer.innerHTML = `
+                        <div class="text-center text-gray-500 py-12">
+                            <i class="fa-solid fa-exclamation-circle text-4xl mb-4"></i>
+                            <p>找不到相關結果</p>
+                            <p class="text-sm mt-2">請嘗試其他關鍵字</p>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error(e);
+                resultsContainer.innerHTML = `
+                    <div class="text-center text-red-500 py-12">
+                        <i class="fa-solid fa-exclamation-triangle text-4xl mb-4"></i>
+                        <p>搜尋失敗：${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 辭典搜尋框 Enter 鍵支援
+        document.addEventListener('DOMContentLoaded', () => {
+            const dictSearch = document.getElementById('dictionary-search');
+            if (dictSearch) {
+                dictSearch.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        searchDictionary();
+                    }
+                });
+            }
+        });
+
+        function updateNavActive(button) {
+            document.querySelectorAll('.nav-menu-item').forEach(btn => btn.classList.remove('active'));
+            if (button) {
+                button.classList.add('active');
+            }
+        }
+
         // ===== 模式切換 =====
         function switchMode(mode) {
+            // 顯示學習模式視圖，隱藏首頁
+            document.getElementById('home-page').classList.add('hidden');
+            document.getElementById('learning-mode-view').classList.remove('hidden');
+            // 顯示等級選擇器
+            const levelContainer = document.getElementById('level-select-container');
+            if (levelContainer) levelContainer.classList.remove('hidden');
+
             // 停止語音識別的自動重啟
             autoRestartChat = false;
             if (isListening && recognition) {
@@ -1996,7 +2701,10 @@
 
         // 難度等級變更時重新載入內容
         function onLevelChange() {
-            const level = document.getElementById('level-select').value;
+            const levelSelect = document.getElementById('level-select');
+            if (!levelSelect) return;
+            
+            const level = levelSelect.value;
             console.log('難度切換至:', level);
             
             // 清空當前 session 的歷史（但保留持久化的記錄）
@@ -2331,10 +3039,21 @@ If isChinese = false:
                 return;
             }
 
-            document.getElementById('loading').classList.remove('hidden');
+            const loadingEl = document.getElementById('loading');
+            if (loadingEl) {
+                loadingEl.classList.remove('hidden');
+            }
 
             try {
-                const level = document.getElementById('level-select').value;
+                const levelSelect = document.getElementById('level-select');
+                if (!levelSelect) {
+                    console.warn('level-select not found, skipping loadContent');
+                    if (loadingEl) {
+                        loadingEl.classList.add('hidden');
+                    }
+                    return;
+                }
+                const level = levelSelect.value;
                 const topic = APP_STATE.currentTopic;
                 const isKana = isKanaMode(level, topic);
 
@@ -2360,7 +3079,7 @@ If isChinese = false:
                     const prompt = generatePrompt(
                         type,
                         APP_STATE.currentTopic,
-                        document.getElementById('level-select').value,
+                        levelSelect.value,
                         type === 'grammar' ? allExcludedGrammar : allExcludedWords
                     );
 
@@ -2388,7 +3107,9 @@ If isChinese = false:
                 console.error(e);
                 alert('載入失敗：' + e.message);
             } finally {
-                document.getElementById('loading').classList.add('hidden');
+                if (loadingEl) {
+                    loadingEl.classList.add('hidden');
+                }
             }
         }
 
@@ -2471,13 +3192,42 @@ If isChinese = false:
                 romajiEl.style.display = 'none';
             }
             
-            // 背面內容
-            document.getElementById('card-mean').textContent = stripHtml(word.mean);
+            // 背面內容 - 只顯示中文意思，不重複顯示日文單字
+            const meanText = stripHtml(word.mean);
+            // 如果中文意思中包含了日文單字，移除它
+            const wordText = stripHtml(word.word);
+            const kanaText = word.kana ? stripHtml(word.kana) : '';
+            let cleanMean = meanText;
             
-            // 例句 - 移除引號，更自然的顯示
+            // 移除中文意思中可能包含的日文單字或假名
+            if (wordText && cleanMean.includes(wordText)) {
+                cleanMean = cleanMean.replace(wordText, '').trim();
+            }
+            if (kanaText && cleanMean.includes(kanaText)) {
+                cleanMean = cleanMean.replace(kanaText, '').trim();
+            }
+            // 清理多餘的標點符號和空格
+            cleanMean = cleanMean.replace(/^[，。、\s]+|[，。、\s]+$/g, '').trim();
+            
+            document.getElementById('card-mean').textContent = cleanMean || meanText;
+            
+            // 例句 - 移除引號，更自然的顯示，並移除例句中重複的單字
             const example = stripHtml(word.example);
             if (example) {
-                document.getElementById('card-example').textContent = example;
+                let cleanExample = example;
+                // 如果例句開頭包含單字本身，移除它
+                if (wordText && cleanExample.startsWith(wordText)) {
+                    cleanExample = cleanExample.substring(wordText.length).trim();
+                    // 移除開頭的標點符號
+                    cleanExample = cleanExample.replace(/^[、。，\s]+/, '').trim();
+                }
+                // 如果例句開頭包含假名，也移除它
+                if (kanaText && cleanExample.startsWith(kanaText)) {
+                    cleanExample = cleanExample.substring(kanaText.length).trim();
+                    cleanExample = cleanExample.replace(/^[、。，\s]+/, '').trim();
+                }
+                
+                document.getElementById('card-example').textContent = cleanExample || example;
                 document.getElementById('card-example').style.display = 'block';
             } else {
                 document.getElementById('card-example').textContent = '（無例句）';
@@ -3202,10 +3952,16 @@ If isChinese = false:
                 `;
 
             try {
+                const levelSelect = document.getElementById('level-select');
+                if (!levelSelect) {
+                    console.warn('level-select not found in chat mode');
+                    return;
+                }
+                
                 const prompt = generatePrompt(
                     'chat',
                     APP_STATE.currentTopic,
-                    document.getElementById('level-select').value,
+                    levelSelect.value,
                     [],
                     message
                 );
@@ -3644,12 +4400,30 @@ If isChinese = false:
         }
 
         function speakExample() {
-            const word = APP_STATE.words[APP_STATE.currentIndex];
-            if (word?.example) {
-                const example = word.example.trim();
+            // 使用顯示在卡片上的例句（已經清理過，不包含重複的單字）
+            const exampleEl = document.getElementById('card-example');
+            if (exampleEl && exampleEl.textContent && exampleEl.textContent !== '（無例句）') {
+                const example = exampleEl.textContent.trim();
                 if (example) {
                     // 例句使用稍慢的速度，方便理解
                     speakText(example, 0.75);
+                }
+            } else {
+                // 如果卡片上沒有例句，使用原始例句
+                const word = APP_STATE.words[APP_STATE.currentIndex];
+                if (word?.example) {
+                    let example = word.example.trim();
+                    // 移除例句開頭可能包含的單字
+                    const wordText = word.word ? word.word.trim() : '';
+                    const kanaText = word.kana ? word.kana.trim() : '';
+                    if (wordText && example.startsWith(wordText)) {
+                        example = example.substring(wordText.length).trim().replace(/^[、。，\s]+/, '');
+                    } else if (kanaText && example.startsWith(kanaText)) {
+                        example = example.substring(kanaText.length).trim().replace(/^[、。，\s]+/, '');
+                    }
+                    if (example) {
+                        speakText(example, 0.75);
+                    }
                 }
             }
         }
@@ -4243,9 +5017,143 @@ If isChinese = false:
             setTimeout(() => toast.remove(), 4000);
         }
 
-        // 初始化語音辨識
+        // ===== 搜尋功能 =====
+        function initSearch() {
+            const searchInput = document.getElementById('search-input');
+            const searchResults = document.getElementById('search-results');
+            const mobileSearchInput = document.getElementById('mobile-search-input');
+            const mobileSearchResults = document.getElementById('mobile-search-results');
+            
+            if (searchInput && searchResults) {
+                let searchTimeout;
+                
+                searchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    const query = e.target.value.trim();
+                    
+                    if (query.length === 0) {
+                        searchResults.classList.add('hidden');
+                        return;
+                    }
+
+                    searchTimeout = setTimeout(() => {
+                        performSearch(query, searchResults);
+                    }, 300);
+                });
+
+                searchInput.addEventListener('focus', () => {
+                    if (searchInput.value.trim().length > 0) {
+                        performSearch(searchInput.value.trim(), searchResults);
+                    }
+                });
+
+                // 點擊外部關閉搜尋結果
+                document.addEventListener('click', (e) => {
+                    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                        searchResults.classList.add('hidden');
+                    }
+                });
+            }
+
+            // 移動端搜尋
+            if (mobileSearchInput && mobileSearchResults) {
+                let mobileSearchTimeout;
+                
+                mobileSearchInput.addEventListener('input', (e) => {
+                    clearTimeout(mobileSearchTimeout);
+                    const query = e.target.value.trim();
+                    
+                    if (query.length === 0) {
+                        mobileSearchResults.classList.add('hidden');
+                        return;
+                    }
+
+                    mobileSearchTimeout = setTimeout(() => {
+                        performSearch(query, mobileSearchResults);
+                    }, 300);
+                });
+            }
+        }
+
+        function toggleMobileSearch() {
+            const modal = document.getElementById('mobile-search-modal');
+            if (modal) {
+                modal.classList.toggle('hidden');
+                if (!modal.classList.contains('hidden')) {
+                    const input = document.getElementById('mobile-search-input');
+                    if (input) {
+                        setTimeout(() => input.focus(), 100);
+                    }
+                }
+            }
+        }
+
+        function performSearch(query, resultsContainer) {
+            if (!resultsContainer) return;
+
+            // 簡單的搜尋實現（可以擴展為更複雜的搜尋）
+            const results = [];
+            
+            // 搜尋主題
+            Object.values(TOPICS).flat().forEach(topic => {
+                if (topic.label.toLowerCase().includes(query.toLowerCase()) || 
+                    topic.value.toLowerCase().includes(query.toLowerCase())) {
+                    results.push({
+                        type: '主題',
+                        title: topic.label,
+                        action: () => {
+                            switchMode('flashcard');
+                            document.getElementById('topic-select').value = topic.value;
+                            onTopicChange();
+                            // 如果是移動端，關閉搜尋模態框
+                            const mobileModal = document.getElementById('mobile-search-modal');
+                            if (mobileModal && !mobileModal.classList.contains('hidden')) {
+                                toggleMobileSearch();
+                            }
+                        }
+                    });
+                }
+            });
+
+            // 顯示結果
+            if (results.length > 0) {
+                resultsContainer.innerHTML = results.slice(0, 5).map((result, idx) => `
+                    <div class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 search-result-item" data-index="${idx}">
+                        <div class="text-sm font-semibold text-gray-900">${result.title}</div>
+                        <div class="text-xs text-gray-500 mt-1">${result.type}</div>
+                    </div>
+                `).join('');
+                
+                // 綁定點擊事件
+                resultsContainer.querySelectorAll('.search-result-item').forEach((el, idx) => {
+                    el.addEventListener('click', () => {
+                        results[idx].action();
+                        resultsContainer.classList.add('hidden');
+                        const searchInput = document.getElementById('search-input') || document.getElementById('mobile-search-input');
+                        if (searchInput) searchInput.value = '';
+                    });
+                });
+                
+                resultsContainer.classList.remove('hidden');
+            } else {
+                resultsContainer.innerHTML = `
+                    <div class="px-4 py-8 text-center text-gray-500">
+                        <i class="fa-solid fa-search text-2xl mb-2"></i>
+                        <p class="text-sm">找不到相關結果</p>
+                        <p class="text-xs mt-1">請嘗試其他關鍵字</p>
+                    </div>
+                `;
+                resultsContainer.classList.remove('hidden');
+            }
+        }
+
+        // 初始化語音辨識和搜尋
         document.addEventListener('DOMContentLoaded', () => {
             initSpeechRecognition();
+            initSearch();
+            
+            // 初始化時顯示首頁
+            showHomePage();
         });
 
         // ===== 鍵盤快捷鍵 =====
