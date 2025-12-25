@@ -1551,6 +1551,15 @@
                     <!-- 文法模式 -->
                     <div id="view-grammar" class="view-section hidden">
                         <div class="glass-card rounded-3xl p-6 md:p-10 animate-slide">
+                            <!-- 換一批按鈕 -->
+                            <div class="flex items-center justify-end mb-4">
+                                <button onclick="regenerateContent()" 
+                                    class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:from-indigo-600 hover:to-purple-600 flex items-center gap-2 transition shadow-md hover:shadow-lg font-semibold"
+                                    title="換一批新文法">
+                                    <i class="fa-solid fa-shuffle"></i> 換一批
+                                </button>
+                            </div>
+                            
                             <!-- 文法概念區域 -->
                             <div class="mb-8">
                                 <div class="inline-flex items-center gap-2 bg-amber-100 border-2 border-amber-300 px-5 py-2 rounded-full text-sm font-bold text-amber-700 mb-6 shadow-sm">
@@ -2695,6 +2704,19 @@
                     }
                 });
             }
+            
+            // 如果是文法模式，把當前的文法概念加入排除列表
+            if (APP_STATE.currentMode === 'grammar') {
+                const conceptEl = document.getElementById('grammar-concept');
+                if (conceptEl && conceptEl.textContent) {
+                    const concept = conceptEl.textContent.trim();
+                    if (concept && !APP_STATE.grammarHistory.includes(concept)) {
+                        APP_STATE.grammarHistory.push(concept);
+                        trimArray(APP_STATE.grammarHistory, 400);
+                    }
+                }
+            }
+            
             APP_STATE.currentIndex = 0;
             loadContent();
         }
@@ -2842,25 +2864,118 @@ ${extraInstruction ? `\n**FOCUS:** ${extraInstruction}` : ''}
 }`;
 
                 case 'grammar':
+                    const grammarRandomInstruction = getRandomInstruction();
+                    const grammarRandomSeed = getRandomSeed();
+                    const grammarTimestamp = Date.now();
+                    
+                    // 強制指定3個不同的題型，確保每次都不一樣
+                    const allQuestionFormats = [
+                        { type: 'multiple_choice', desc: 'Multiple choice: "Choose the correct particle/word to complete the sentence"', format: 'question with 4 options' },
+                        { type: 'fill_blank', desc: 'Fill-in-the-blank: "Complete the sentence by choosing は or が"', format: 'sentence with blank (___) and 4 options' },
+                        { type: 'sentence_completion', desc: 'Sentence completion: "Which sentence correctly uses the grammar point?"', format: 'incomplete sentence with 4 completion options' },
+                        { type: 'error_correction', desc: 'Error correction: "Find the mistake in this sentence"', format: 'sentence with error, 4 correction options' },
+                        { type: 'translation_choice', desc: 'Translation choice: "Which Japanese sentence matches the Chinese meaning?"', format: 'Chinese meaning with 4 Japanese sentence options' },
+                        { type: 'context_application', desc: 'Context application: "In this situation, which is correct?"', format: 'scenario description with 4 response options' },
+                        { type: 'sentence_reordering', desc: 'Sentence reordering: "Arrange words to form correct sentence"', format: 'scrambled words with 4 arrangement options' },
+                        { type: 'usage_identification', desc: 'Usage identification: "Which sentence uses the grammar correctly?"', format: '4 sentences, identify correct usage' }
+                    ];
+                    
+                    // 隨機選擇3個不同的題型
+                    const shuffled = shuffleArray([...allQuestionFormats]);
+                    const selectedFormats = shuffled.slice(0, 3);
+                    
+                    // 隨機選擇場景主題
+                    const scenarioThemes = [
+                        'daily conversation', 'shopping', 'restaurant', 'travel', 'workplace', 
+                        'school', 'family', 'weather', 'hobbies', 'health', 'transportation',
+                        'shopping mall', 'hotel', 'hospital', 'post office', 'bank', 'library',
+                        'park', 'cinema', 'gym', 'cafe', 'station', 'airport'
+                    ];
+                    const selectedThemes = shuffleArray([...scenarioThemes]).slice(0, 3);
+                    
+                    const formatInstructions = selectedFormats.map((fmt, idx) => 
+                        `Question ${idx + 1}: ${fmt.desc} - Format: ${fmt.format} - Context: ${selectedThemes[idx]}`
+                    ).join('\n');
+                    
+                    // 生成隨機文法概念提示，確保每次選擇不同的文法點
+                    const grammarConcepts = [
+                        'particles (は、が、を、に、で、と、から、まで、へ)',
+                        'verb forms (て形、た形、ない形、ます形、辞書形)',
+                        'adjectives (い形容詞、な形容詞)',
+                        'conditional forms (と、ば、たら、なら)',
+                        'potential form (できる、られる)',
+                        'passive form (られる、れる)',
+                        'causative form (させる、せる)',
+                        'honorific language (敬語)',
+                        'sentence endings (です、ます、だ、である)',
+                        'time expressions (時、に、から、まで)',
+                        'comparison (より、ほど、くらい)',
+                        'giving and receiving (あげる、くれる、もらう)',
+                        'wish and desire (たい、ほしい、ほしがる)',
+                        'obligation and permission (なければならない、てもいい)',
+                        'prohibition (てはいけない、な)',
+                        'suggestion and advice (たほうがいい、たらどう)',
+                        'experience (ことがある、ことがない)',
+                        'appearance and hearsay (そうだ、ようだ、らしい)',
+                        'purpose and intention (ために、ように)',
+                        'concession (ても、のに、ながら)'
+                    ];
+                    const randomConceptHint = grammarConcepts[Math.floor(Math.random() * grammarConcepts.length)];
+                    
                     return `You are an expert Japanese grammar teacher creating interactive quiz content.
 
 **Context:**
-- Grammar Topic: "${topic}"
+- Grammar Topic Area: "${topic}"
 - Level: ${level} (${levelDesc})
-- Previously used content to avoid: [${excludeText}]
+- Request ID: ${grammarTimestamp} (MUST generate DIFFERENT grammar concept each time)
+- Previously learned grammar concepts to AVOID: [${excludeText}]
+- Suggested grammar category: ${randomConceptHint}
 
-**Task:** Create a grammar lesson with 3 quiz questions for Japanese learners (Traditional Chinese UI).
+**CRITICAL - MUST choose a DIFFERENT grammar concept:**
+1. You MUST select a COMPLETELY DIFFERENT grammar concept/concept from what's in the exclusion list
+2. If the exclusion list contains "は vs が", you MUST choose a DIFFERENT grammar point (e.g., "て形", "ない形", "と/ば/たら", "あげる/くれる/もらう", etc.)
+3. Do NOT repeat the same grammar concept even if the topic area is the same
+4. Choose a NEW grammar point that hasn't been taught before
+5. The grammar concept in "concept" field MUST be different from all previous concepts
+
+**Question Format Requirements:**
+${formatInstructions}
+
+**CRITICAL REQUIREMENTS:**
+1. Select a DIFFERENT grammar concept (not in exclusion list)
+2. Question 1 MUST be in format: ${selectedFormats[0].type} (${selectedFormats[0].desc})
+3. Question 2 MUST be in format: ${selectedFormats[1].type} (${selectedFormats[1].desc})
+4. Question 3 MUST be in format: ${selectedFormats[2].type} (${selectedFormats[2].desc})
+5. Each question MUST use a DIFFERENT scenario: ${selectedThemes[0]}, ${selectedThemes[1]}, ${selectedThemes[2]}
+
+**Random Variations:**
+- ${grammarRandomInstruction}
+- ${grammarRandomSeed}
+
+**Task:** Create a grammar lesson with a NEW grammar concept (different from exclusion list) and EXACTLY 3 quiz questions.
 
 **Output Format (JSON only, no markdown):**
 {
-    "concept": "日文文法概念 (Japanese)",
+    "concept": "日文文法概念 (Japanese) - MUST be a DIFFERENT grammar point from exclusion list",
     "explanation": "清晰的繁體中文解釋，包含用法與常見錯誤",
     "example_sentences": ["Example 1 (Japanese)", "Example 2 (Japanese)"],
     "quiz": [
         {
-            "question": "填空或選擇題（日文句子，可含中文提示）",
+            "question": "Question 1 in ${selectedFormats[0].type} format about ${selectedThemes[0]}",
             "options": ["option1", "option2", "option3", "option4"],
             "answer": 2,
+            "reason": "繁體中文說明為什麼正確"
+        },
+        {
+            "question": "Question 2 in ${selectedFormats[1].type} format about ${selectedThemes[1]}",
+            "options": ["option1", "option2", "option3", "option4"],
+            "answer": 1,
+            "reason": "繁體中文說明為什麼正確"
+        },
+        {
+            "question": "Question 3 in ${selectedFormats[2].type} format about ${selectedThemes[2]}",
+            "options": ["option1", "option2", "option3", "option4"],
+            "answer": 0,
             "reason": "繁體中文說明為什麼正確"
         }
     ]
@@ -3099,6 +3214,12 @@ If isChinese = false:
                         APP_STATE.grammarHistory.push(concept);
                         trimArray(APP_STATE.grammarHistory, 400);
                         saveLearnedGrammar(concept, APP_STATE.currentTopic);
+                        
+                        // 限制排除列表長度，避免過長導致無法生成新內容
+                        if (APP_STATE.grammarHistory.length > 50) {
+                            APP_STATE.grammarHistory = APP_STATE.grammarHistory.slice(-50);
+                        }
+                        
                         renderGrammar(data);
                     }
                 }
@@ -3211,10 +3332,22 @@ If isChinese = false:
             
             document.getElementById('card-mean').textContent = cleanMean || meanText;
             
-            // 例句 - 移除引號，更自然的顯示，並移除例句中重複的單字
+            // 例句 - 移除引號，更自然的顯示，並移除例句中重複的單字和括號內容
             const example = stripHtml(word.example);
             if (example) {
                 let cleanExample = example;
+                
+                // 移除所有括號及其內容（包括全形和半形括號）
+                cleanExample = cleanExample.replace(/[（(].*?[）)]/g, '');
+                
+                // 移除中文翻譯（中文字符）
+                cleanExample = cleanExample.replace(/[\u4e00-\u9fa5]/g, '');
+                
+                // 移除羅馬音（只保留日文字符和標點符號）
+                // 但保留日文句子結構，移除多餘的英文字母和空格
+                cleanExample = cleanExample.replace(/[a-zA-Z\s]+(?=[。、，])/g, '');
+                cleanExample = cleanExample.replace(/\s+/g, ' ').trim();
+                
                 // 如果例句開頭包含單字本身，移除它
                 if (wordText && cleanExample.startsWith(wordText)) {
                     cleanExample = cleanExample.substring(wordText.length).trim();
@@ -3225,6 +3358,12 @@ If isChinese = false:
                 if (kanaText && cleanExample.startsWith(kanaText)) {
                     cleanExample = cleanExample.substring(kanaText.length).trim();
                     cleanExample = cleanExample.replace(/^[、。，\s]+/, '').trim();
+                }
+                
+                // 如果清理後為空，使用原始例句的第一個日文句子
+                if (!cleanExample || cleanExample.length === 0) {
+                    const firstSentence = example.split(/[（(]/)[0].trim();
+                    cleanExample = firstSentence;
                 }
                 
                 document.getElementById('card-example').textContent = cleanExample || example;
@@ -3661,14 +3800,17 @@ If isChinese = false:
                 const shuffled = shuffleArray(optionObjects);
                 const correctIndex = shuffled.findIndex(o => o.i === q.answer);
 
-                const optionsHtml = shuffled.map((item, i) => `
+                const optionsHtml = shuffled.map((item, i) => {
+                    const safeReason = stripHtml(q.reason || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `
                     <button 
-                        onclick="checkGrammarAnswer(this, ${i}, ${correctIndex}, '${stripHtml(q.reason || '').replace(/'/g, "\\'")})"
+                        onclick="checkGrammarAnswer(this, ${i}, ${correctIndex}, '${safeReason}')"
                         data-correct="${i === correctIndex}"
-                        class="btn-option w-full py-3 px-4 rounded-lg text-left text-sm">
+                        class="btn-option w-full py-3 px-4 rounded-lg text-left text-sm cursor-pointer">
                         <span class="font-bold text-blue-300 mr-2">(${i + 1})</span>${stripHtml(item.opt)}
                     </button>
-                `).join('');
+                `;
+                }).join('');
 
                 return `
                 <div class="bg-white/5 rounded-xl p-4">
@@ -3800,9 +3942,53 @@ If isChinese = false:
         }
 
         function checkGrammarAnswer(btn, selected, correct, reason) {
-            const container = btn.closest('.space-y-2');
-            const feedback = btn.closest('.bg-white\\/5').querySelector('.grammar-feedback');
-            if (!container || !feedback) return;
+            if (!btn) return;
+            
+            // 找到包含所有选项的容器
+            const questionContainer = btn.closest('[class*="rounded-xl"]') || btn.closest('[class*="rounded-lg"]');
+            if (!questionContainer) return;
+            
+            const container = questionContainer.querySelector('.space-y-2') || questionContainer.querySelector('.space-y-3');
+            const feedback = questionContainer.querySelector('.grammar-feedback');
+            
+            if (!container || !feedback) {
+                // 如果找不到容器，尝试直接使用问题容器
+                const buttons = Array.from(questionContainer.querySelectorAll('button.btn-option'));
+                if (buttons.length === 0) return;
+                
+                // 检查是否已经回答过
+                if (questionContainer.dataset.answered === 'true') return;
+                questionContainer.dataset.answered = 'true';
+                
+                const correctBtn = buttons.find(b => b.dataset.correct === 'true');
+                
+                if (selected === correct) {
+                    btn.classList.add('correct');
+                    playSound('correct');
+                    addXP(10);
+                    if (feedback) {
+                        feedback.innerHTML = `<span class="text-green-600 font-bold">✓ 正確！${reason ? '<br>' + reason : ''}</span>`;
+                        feedback.classList.remove('hidden');
+                    }
+                } else {
+                    btn.classList.add('wrong');
+                    if (correctBtn) correctBtn.classList.add('correct');
+                    playSound('wrong');
+                    if (feedback) {
+                        feedback.innerHTML = `<span class="text-red-600 font-bold">✗ 錯誤。正確答案是選項 ${correct + 1}。${reason ? '<br>' + reason : ''}</span>`;
+                        feedback.classList.remove('hidden');
+                    }
+                }
+                
+                // 禁用所有選項
+                buttons.forEach(b => {
+                    b.disabled = true;
+                    b.style.pointerEvents = 'none';
+                });
+                return;
+            }
+            
+            // 检查是否已经回答过
             if (container.dataset.answered === 'true') return;
             container.dataset.answered = 'true';
 
@@ -3813,17 +3999,20 @@ If isChinese = false:
                 btn.classList.add('correct');
                 playSound('correct');
                 addXP(10);
-                feedback.innerHTML = `<span class="text-green-400">✓ ${reason}</span>`;
+                feedback.innerHTML = `<span class="text-green-600 font-bold">✓ 正確！${reason ? '<br>' + reason : ''}</span>`;
             } else {
                 btn.classList.add('wrong');
                 if (correctBtn) correctBtn.classList.add('correct');
                 playSound('wrong');
-                feedback.innerHTML = `<span class="text-red-400">✗ ${reason}</span>`;
+                feedback.innerHTML = `<span class="text-red-600 font-bold">✗ 錯誤。正確答案是選項 ${correct + 1}。${reason ? '<br>' + reason : ''}</span>`;
             }
             feedback.classList.remove('hidden');
 
             // 禁用所有選項
-            buttons.forEach(b => b.disabled = true);
+            buttons.forEach(b => {
+                b.disabled = true;
+                b.style.pointerEvents = 'none';
+            });
         }
 
         // ===== AI 對話模式 =====
@@ -4400,30 +4589,79 @@ If isChinese = false:
         }
 
         function speakExample() {
+            // 提取純日文例句，移除所有括號內容和中文翻譯
+            function extractJapaneseOnly(text) {
+                if (!text) return '';
+                
+                // 移除所有括號及其內容（包括全形和半形括號）
+                let clean = text.replace(/[（(].*?[）)]/g, '');
+                
+                // 移除中文（中文字符範圍）
+                clean = clean.replace(/[\u4e00-\u9fa5]/g, '');
+                
+                // 移除羅馬音（只保留日文字符、假名、標點符號）
+                // 保留日文字符、假名、標點符號（。、，等）
+                clean = clean.replace(/[a-zA-Z\s]+/g, '');
+                
+                // 清理多餘的空格和標點
+                clean = clean.trim().replace(/\s+/g, '');
+                
+                // 如果結果為空，嘗試提取第一個日文句子（到第一個括號或中文為止）
+                if (!clean || clean.length === 0) {
+                    // 找到第一個日文字符到第一個括號或中文字符的位置
+                    const japaneseMatch = text.match(/^[^（(（\u4e00-\u9fa5]*/);
+                    if (japaneseMatch) {
+                        clean = japaneseMatch[0].trim();
+                    }
+                }
+                
+                return clean;
+            }
+            
             // 使用顯示在卡片上的例句（已經清理過，不包含重複的單字）
             const exampleEl = document.getElementById('card-example');
+            let exampleText = '';
+            
             if (exampleEl && exampleEl.textContent && exampleEl.textContent !== '（無例句）') {
-                const example = exampleEl.textContent.trim();
-                if (example) {
-                    // 例句使用稍慢的速度，方便理解
-                    speakText(example, 0.75);
-                }
+                exampleText = exampleEl.textContent.trim();
             } else {
                 // 如果卡片上沒有例句，使用原始例句
                 const word = APP_STATE.words[APP_STATE.currentIndex];
                 if (word?.example) {
-                    let example = word.example.trim();
-                    // 移除例句開頭可能包含的單字
+                    exampleText = word.example.trim();
+                }
+            }
+            
+            if (exampleText) {
+                // 提取純日文部分
+                let japaneseOnly = extractJapaneseOnly(exampleText);
+                
+                // 如果提取失敗，嘗試更簡單的方法：取第一個句子（到第一個括號為止）
+                if (!japaneseOnly || japaneseOnly.length === 0) {
+                    const firstSentence = exampleText.split(/[（(]/)[0].trim();
+                    japaneseOnly = firstSentence;
+                }
+                
+                // 移除例句開頭可能包含的單字（避免重複）
+                const word = APP_STATE.words[APP_STATE.currentIndex];
+                if (word) {
                     const wordText = word.word ? word.word.trim() : '';
                     const kanaText = word.kana ? word.kana.trim() : '';
-                    if (wordText && example.startsWith(wordText)) {
-                        example = example.substring(wordText.length).trim().replace(/^[、。，\s]+/, '');
-                    } else if (kanaText && example.startsWith(kanaText)) {
-                        example = example.substring(kanaText.length).trim().replace(/^[、。，\s]+/, '');
+                    
+                    // 如果例句開頭包含單字，移除它
+                    if (wordText && japaneseOnly.startsWith(wordText)) {
+                        japaneseOnly = japaneseOnly.substring(wordText.length).trim();
+                        // 移除開頭的標點符號
+                        japaneseOnly = japaneseOnly.replace(/^[、。，\s]+/, '');
+                    } else if (kanaText && japaneseOnly.startsWith(kanaText)) {
+                        japaneseOnly = japaneseOnly.substring(kanaText.length).trim();
+                        japaneseOnly = japaneseOnly.replace(/^[、。，\s]+/, '');
                     }
-                    if (example) {
-                        speakText(example, 0.75);
-                    }
+                }
+                
+                if (japaneseOnly && japaneseOnly.length > 0) {
+                    // 只播放一次，使用稍慢的速度，方便理解
+                    speakText(japaneseOnly, 0.75);
                 }
             }
         }
