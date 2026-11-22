@@ -399,11 +399,11 @@
 const STORE_KEY = 'shotengai_v1';
 const KEY_STORE = 'claude_api_key';
 const MODEL_STORE = 'claude_model';
-const DEFAULT_MODEL = 'claude-opus-5-5';
+const DEFAULT_MODEL = 'claude-haiku-5-5';
 const MODELS = [
-    ['claude-opus-5-5', 'Claude Opus 5.5（預設，品質最好）'],
+    ['claude-haiku-5-5', 'Claude Haiku 5.5（預設，最快、最省）'],
     ['claude-sonnet-5-5', 'Claude Sonnet 5.5（均衡）'],
-    ['claude-haiku-5-5', 'Claude Haiku 5.5（最快、最省）']
+    ['claude-opus-5-5', 'Claude Opus 5.5（品質最好）']
 ];
 const MODELS_WITH_FALLBACK = ['claude-opus-5-5', 'claude-sonnet-5-5'];
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
@@ -460,6 +460,12 @@ const SHOP_TYPES = [
     { id: 'ryokan', name: '溫泉旅館', e: '♨️', tiers: ['小民宿', '溫泉旅館', '百年名湯旅館'], says: ['ようこそお越しくださいました。', 'お風呂は二十四時間入れます。', 'ごゆっくりおくつろぎください。'] }
 ];
 
+// 店鋪特性：只要擁有該種店就生效，收集越多種店加成越多
+const PERKS = {
+    yatai: '叫賣時間 +5 秒', konbini: '進貨的日圓 +20%', ramen: '所有評價 +10%', cafe: '人氣下降速度減半',
+    sushi: '盤點的日圓 ×2', drug: '新鮮度下降速度減半', ekiben: '評論家每題多 5 秒', ryokan: '常客好感每次多 +1'
+};
+
 const SUPPLIES = [
     { id: 'rice', e: '🍙', name: '基本食材', fresh: 25, bonus: 0, price: 60, desc: '新鮮度 +25' },
     { id: 'fish', e: '🐟', name: '市場鮮魚', fresh: 55, bonus: 5, price: 150, desc: '新鮮度 +55・評價 +5' },
@@ -500,6 +506,10 @@ const ACHIEVEMENTS = [
     { id: 't3', icon: '🏯', name: '名店誕生', desc: '有一間店改裝到最終階段', v: () => S.shops.some(s => tierIndex(s) >= 2) ? 1 : 0, goal: 1, coins: 1500 },
     { id: 'ch20', icon: '💬', name: '能說會道', desc: '會話中用日文回 20 句', v: () => S.totals.chats, goal: 20, coins: 500 },
     { id: 'g10', icon: '📐', name: '文法修行', desc: '完成 10 次文法道場', v: () => S.totals.grammar, goal: 10, coins: 600 },
+    { id: 'st3', icon: '🌟', name: '星級商店街', desc: '3 條街拿到星級評鑑', v: () => S.totals.stars || 0, goal: 3, coins: 2000 },
+    { id: 'rk3', icon: '🏅', name: '觀光名所', desc: '商店街升到「觀光名所」', v: () => townRank(), goal: 3, coins: 1500 },
+    { id: 'o20', icon: '🛎️', name: '待客之道', desc: '接單接待 20 位客人', v: () => S.totals.orders || 0, goal: 20, coins: 500 },
+    { id: 'mm10', icon: '🃏', name: '陳列高手', desc: '完成 10 次陳列配對', v: () => S.totals.matches || 0, goal: 10, coins: 400 },
     { id: 'ka100', icon: '🈁', name: '五十音達人', desc: '五十音道場答對 100 題', v: () => S.totals.kana, goal: 100, coins: 400 }
 ];
 
@@ -851,7 +861,7 @@ Object.assign(FLUENT, {
     "🧮": "Abacus|abacus", "🧳": "Luggage|luggage", "👔": "Necktie|necktie", "🥼": "Lab coat|lab_coat", "☂️": "Umbrella|umbrella", "🍁": "Maple leaf|maple_leaf",
     "🍂": "Fallen leaf|fallen_leaf", "🌰": "Chestnut|chestnut", "🍡": "Dango|dango", "🎆": "Fireworks|fireworks", "🎐": "Wind chime|wind_chime", "🍧": "Shaved ice|shaved_ice",
     "🚲": "Bicycle|bicycle", "🏬": "Department store|department_store", "🗼": "Tokyo tower|tokyo_tower", "🌟": "Glowing star|glowing_star", "💯": "Hundred points|hundred_points",
-    "🏘️": "Houses|houses", "📐": "Triangular ruler|triangular_ruler", "🏚️": "Derelict house|derelict_house", "🪧": "Placard|placard", "📝": "Memo|memo", "🈁": "Japanese here button|japanese_here_button"
+    "🏘️": "Houses|houses", "📐": "Triangular ruler|triangular_ruler", "🏚️": "Derelict house|derelict_house", "🪧": "Placard|placard", "📝": "Memo|memo", "🈁": "Japanese here button|japanese_here_button", "🛎️": "Bellhop bell|bellhop_bell"
 });
 const FLUENT_CDN = 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/';
 function fluentUrl(e) {
@@ -945,7 +955,7 @@ function defaultState() {
         shops: [], active: null, lots: [], supplies: { rice: 3 }, bg: 'sunny', bgs: ['sunny'], lastClean: 0,
         progress: {}, dex: {}, legacy: [], grammarSeen: [],
         daily: { date: '', new: 0, correct: 0, chat: 0, claimed: [] },
-        totals: { correct: 0, answered: 0, stages: 0, chats: 0, critics: 0, grammar: 0, perfect: 0, kana: 0 },
+        totals: { correct: 0, answered: 0, stages: 0, chats: 0, critics: 0, grammar: 0, perfect: 0, kana: 0, orders: 0, matches: 0, stars: 0 },
         ach: [], best: { rush: 0 }
     };
 }
@@ -962,6 +972,7 @@ function loadState() {
         if (!s.dex || typeof s.dex !== 'object') s.dex = {};
         if (!s.progress || typeof s.progress !== 'object') s.progress = {};
         if (!LEVELS[s.level]) s.level = 'N5';
+        if (!s.lastCollect) s.lastCollect = Date.now();
         return s;
     }
     // 第一次開啟：把舊版 LinguaMax 的進度帶過來（舊資料保留不刪）
@@ -981,7 +992,7 @@ const G = { tab: 'home', play: null, modalQueue: [], prefetch: {}, chat: null, d
 fluentOn = S.fluent !== false;
 
 function save() {
-    checkAchievements();
+    checkAchievements(); checkRank();
     safeSet(STORE_KEY, JSON.stringify(S));
     renderTop();
 }
@@ -1011,6 +1022,7 @@ function checkAchievements() {
 // ============================================================
 // 店鋪養成
 // ============================================================
+const hasPerk = type => S.shops.some(s => s.type === type);
 const typeOf = s => SHOP_TYPES.find(t => t.id === s.type) || SHOP_TYPES[0];
 function newShop(type, name) {
     const now = Date.now();
@@ -1027,8 +1039,8 @@ function tierIndex(s) { const lv = levelInfo(s).lv; return lv >= TIER_LV[2] ? 2 
 function tierName(s) { return typeOf(s).tiers[tierIndex(s)]; }
 function nextTierLv(s) { const t = tierIndex(s); return t < 2 ? TIER_LV[t + 1] : null; }
 // 新鮮度每小時 -2、人氣每小時 -3
-function freshness(s) { return Math.round(clamp(s.fresh - (Date.now() - s.freshAt) / 3.6e6 * 2)); }
-function popularity(s) { return Math.round(clamp(s.pop - (Date.now() - s.popAt) / 3.6e6 * 3)); }
+function freshness(s) { return Math.round(clamp(s.fresh - (Date.now() - s.freshAt) / 3.6e6 * (hasPerk('drug') ? 1 : 2))); }
+function popularity(s) { return Math.round(clamp(s.pop - (Date.now() - s.popAt) / 3.6e6 * (hasPerk('cafe') ? 1.5 : 3))); }
 function setFresh(s, v) { s.fresh = clamp(v); s.freshAt = Date.now(); }
 function setPop(s, v) { s.pop = clamp(v); s.popAt = Date.now(); }
 function hearts(s) { return Math.min(5, Math.floor(s.bond / 20)); }
@@ -1036,10 +1048,34 @@ function xpMultiplier(s) { if (freshness(s) < 20) return .5; return popularity(s
 function shopArt(s, px) { return artHTML(`shop_${s.type}_${tierIndex(s) + 1}`, typeOf(s).e, px); }
 function shopHTML(s, px) { return `<div class="shop-wrap" id="shop-wrap" onclick="pokeShop()"><span class="shop">${shopArt(s, px)}</span></div><div class="shadow"></div>`; }
 
+// 商店街等級：店鋪等級、評鑑與單字量累積成「發展度」
+const RANKS = [[0, '無名小巷'], [8, '街角商圈'], [20, '人氣商店街'], [40, '觀光名所'], [70, '傳說商店街']];
+function townScore() { return S.shops.reduce((a, s) => a + levelInfo(s).lv, 0) + S.totals.critics * 3 + (S.totals.stars || 0) * 3 + Math.floor(dexCount() / 20); }
+function townRank() { const sc = townScore(); let i = 0; while (i + 1 < RANKS.length && sc >= RANKS[i + 1][0]) i++; return i; }
+function checkRank() {
+    const r = townRank();
+    if (r <= (S.rank || 0)) return;
+    S.rank = r; const coins = r * 300; S.coins += coins;
+    queueModal(() => { showModal(`<div class="text-center"><div class="text-6xl">🏅</div><div class="text-sm font-black mt-2" style="color:var(--pri-d)">商店街升級</div>
+        <h3 class="text-2xl font-black mt-1">${RANKS[r][1]}</h3><div class="mt-3 font-black space-y-1"><div>💴 +${coins}</div><div>💰 營業額 +${r * 10}%</div></div>
+        <button class="btn w-full mt-4" onclick="closeModal()">太棒了！</button></div>`, { sticky: true }); playSound('win'); burst(); });
+}
+// 營業額：不在線上時店鋪照常營業，最多累積 8 小時；新鮮度和人氣越高賺越多
+const INCOME_CAP_H = 8;
+function incomeRate() { return S.shops.reduce((a, s) => a + [20, 45, 90][tierIndex(s)] * (.5 + freshness(s) / 200 + popularity(s) / 200), 0) * (1 + townRank() * .1); }
+function pendingIncome() { return S.lastCollect ? Math.floor(Math.min(INCOME_CAP_H, (Date.now() - S.lastCollect) / 3.6e6) * incomeRate()) : 0; }
+function collectIncome() {
+    const n = pendingIncome();
+    if (n < 1) return toast('還沒有營業額可以收，晚點再來。');
+    S.coins += n; S.lastCollect = Date.now();
+    playSound('coin'); toast(`💰 收到營業額 💴 ${n}`, 'gold');
+    save(); renderHome();
+}
+
 function gainXp(s, n) {
     if (!s || n <= 0) return 0;
     const before = levelInfo(s).lv, tBefore = tierIndex(s);
-    const add = Math.max(1, Math.round(n * xpMultiplier(s)));
+    const add = Math.max(1, Math.round(n * xpMultiplier(s) * (hasPerk('ramen') ? 1.1 : 1)));
     s.xp += add;
     const after = levelInfo(s).lv;
     if (tierIndex(s) > tBefore) queueModal(() => showRenovate(s, tBefore));
@@ -1049,7 +1085,7 @@ function gainXp(s, n) {
 function addBond(s, n) {
     if (!s) return;
     const h = hearts(s);
-    s.bond = clamp(s.bond + n);
+    s.bond = clamp(s.bond + n + (hasPerk('ryokan') ? 1 : 0));
     if (hearts(s) > h) toast(`💞 ${s.name} 的常客變多了！（${'❤️'.repeat(hearts(s))}）`, 'good');
 }
 function progressLots(n = 1) {
@@ -1218,9 +1254,10 @@ Rules:
 - "distractors": 3 plausible but WRONG Traditional Chinese meanings, all different from "mean".
 - "rarity": 1 (common), 2 (useful), or 3 (advanced for this level).
 - "notes": optional short Traditional Chinese tip about politeness, nuance or pronunciation.
+- "chunks": the "example" sentence split into 3-6 natural chunks in order (a word with its particle stays together). Joined together they must equal "example" exactly, including the final punctuation.
 
 JSON shape:
-{"words":[{"word":"領収書","kana":"りょうしゅうしょ","romaji":"ryoushuusho","pos":"名詞","mean":"收據","example":"領収書をお願いします。","trans":"請給我收據。","distractors":["發票號碼","零錢","購物袋"],"rarity":2,"notes":"比レシート正式，報帳時用。"}]}`;
+{"words":[{"word":"領収書","kana":"りょうしゅうしょ","romaji":"ryoushuusho","pos":"名詞","mean":"收據","example":"領収書をお願いします。","trans":"請給我收據。","distractors":["發票號碼","零錢","購物袋"],"rarity":2,"notes":"比レシート正式，報帳時用。","chunks":["領収書を","お願い","します。"]}]}`;
 }
 
 function grammarPrompt(topic, seen) {
@@ -1273,6 +1310,10 @@ function cleanWords(words) {
         seen.add(w.word);
         w.distractors = [...new Set((Array.isArray(w.distractors) ? w.distractors : []).map(x => String(x).trim()).filter(x => x && x !== w.mean))].slice(0, 3);
         w.rarity = [1, 2, 3].includes(w.rarity) ? w.rarity : 1;
+        // 例句分段：接起來必須和例句完全一樣，否則不出句子重組題
+        const strip = x => String(x).replace(/\s+/g, '');
+        if (Array.isArray(w.chunks) && w.chunks.length >= 3 && w.chunks.length <= 7 && w.chunks.every(c => typeof c === 'string' && c.trim()) && w.chunks.map(strip).join('') === strip(w.example || '')) w.chunks = w.chunks.map(strip);
+        else delete w.chunks;
         return true;
     }).slice(0, WORDS_PER_STAGE);
 }
@@ -1316,7 +1357,7 @@ function closeModal() {
     $('modal-root').innerHTML = ''; G.modalOpen = false; G.modalSticky = false;
     flushModals();
 }
-function flushModals() { if (!G.modalOpen && G.modalQueue.length) G.modalQueue.shift()(); }
+function flushModals() { if (!G.modalOpen && !G.play && G.modalQueue.length) G.modalQueue.shift()(); }
 function queueModal(fn) { G.modalQueue.push(fn); setTimeout(flushModals, 0); }
 
 // ============================================================
@@ -1375,6 +1416,7 @@ function renderHome() {
     const bg = BGS.find(b => b.id === S.bg) || BGS[0];
     const decoPos = [[6, 10], [84, 14], [10, 62], [86, 58]];
     const due = dueWords().length, wrong = wrongWords().length, count = dexCount();
+    const rk = townRank(), sc = townScore(), nextSc = RANKS[rk + 1]?.[0], baseSc = RANKS[rk][0], inc = pendingIncome();
     const cleanLeft = Math.max(0, CLEAN_COOLDOWN - (Date.now() - (S.lastClean || 0)));
 
     $('tab-home').innerHTML = `
@@ -1394,8 +1436,22 @@ function renderHome() {
     </div>
 
     <div class="card p-4 mt-4">
+        <div class="flex items-center justify-between mb-3"><h3 class="font-black text-lg">🛎️ 今日營業</h3><span class="text-xs" style="color:var(--muted)">不需要網路</span></div>
+        <div class="grid grid-cols-2 gap-2">
+            <button class="card p-3 text-left" style="background:var(--orange-t);border-color:#f6d9a8" onclick="startOrder()"><div class="text-3xl">🛎️</div><div class="font-black mt-1">接單</div><div class="text-xs" style="color:var(--muted)">聽客人點什麼，從貨架挑出來。賺日圓、人氣和常客</div></button>
+            <button class="card p-3 text-left" style="background:var(--indigo-t);border-color:#c5d9ec" onclick="startMatch()"><div class="text-3xl">🃏</div><div class="font-black mt-1">陳列配對</div><div class="text-xs" style="color:var(--muted)">翻牌把商品和意思配成對。賺日圓、補新鮮度</div></button>
+        </div>
+    </div>
+
+    <div class="card p-4 mt-4">
         <div class="flex items-center justify-between mb-3"><h3 class="font-black text-lg">🏘️ 我的商店街 <span class="text-sm" style="color:var(--muted)">${S.shops.length} 間</span></h3>
             <button class="btn sm orange" onclick="G.shopTab='lot'; openShop()">🪧 租店面</button></div>
+        <div class="rounded-2xl p-3 mb-3" style="background:#fbf6ee">
+            <div class="flex items-center justify-between"><span class="font-black">🏅 ${RANKS[rk][1]}</span><span class="text-xs" style="color:var(--muted)">${nextSc ? `發展度 ${sc}/${nextSc}` : '最高等級'}</span></div>
+            <div class="bar mt-1" style="height:8px"><i style="width:${nextSc ? Math.min(100, (sc - baseSc) / (nextSc - baseSc) * 100) : 100}%;background:var(--gold)"></i></div>
+            <div class="flex items-center gap-2 mt-3"><div class="flex-1 min-w-0"><div class="font-black">💰 營業額 💴 ${inc}</div><div class="text-xs" style="color:var(--muted)">每小時約 💴 ${Math.round(incomeRate())}，最多累積 ${INCOME_CAP_H} 小時${rk ? `・等級加成 +${rk * 10}%` : ''}</div></div>
+                <button class="btn sm orange" ${inc ? '' : 'disabled'} onclick="collectIncome()">收款</button></div>
+        </div>
         <div class="flex gap-2 overflow-x-auto noscroll -mx-1 px-1 pb-1">
             ${S.shops.map(x => `<button class="mini ${x.id === s.id ? 'on' : ''}" onclick="openShopInfo('${x.id}')">
                 <div>${shopArt(x, 44)}</div>
@@ -1519,10 +1575,10 @@ function renderMap() {
     const bossOpen = criticUnlocked(r);
     const bossNode = `<div class="flex justify-center" style="transform:translateX(-35px)">
         <button class="node boss ${bossOpen ? '' : 'locked'} ${cur === STAGES_PER_STREET ? 'current' : ''}" style="${bossOpen ? `--nc:${p.boss ? r.c : '#5b4a40'};--ncd:${p.boss ? r.cd : '#33261f'}` : ''}"
-            onclick="${bossOpen ? `startCritic('${r.id}')` : `toast('完成前 5 關，評論家才會來訪 👀')`}" aria-label="評論家來訪">
+            onclick="${bossOpen ? `criticMenu('${r.id}')` : `toast('完成前 5 關，評論家才會來訪 👀')`}" aria-label="評論家來訪">
             ${cur === STAGES_PER_STREET ? '<span class="start-tag" style="color:#ef4444">評鑑！</span>' : ''}
             ${bossOpen ? artHTML('critic_' + r.id, r.critic, 62) : '🔒'}
-            ${p.boss ? '<span class="node-stars">👑 已通過</span>' : ''}
+            ${p.boss ? `<span class="node-stars">${p.star ? '🌟 星級店街' : '👑 已通過'}</span>` : ''}
         </button>
     </div>`;
     const gram = G.gramAll ? GRAMMAR_TOPICS : GRAMMAR_TOPICS.slice(0, 8);
@@ -1570,7 +1626,7 @@ function closePlay() {
     $('play').classList.add('hidden'); hideSheet();
     document.body.style.overflow = '';
     try { speechSynthesis.cancel(); } catch {}
-    render();
+    render(); flushModals();
 }
 function quitPlay() {
     const p = G.play;
@@ -1607,10 +1663,12 @@ function typesFor(w, pool, choiceOnly = false) {
     const t = ['mean', 'listen'];
     if (othersOf(w, pool, 'word').length >= 3) t.push('reverse');
     if (w.word !== w.kana && othersOf(w, pool, 'kana').length >= 3) t.push('reading');
+    if (w.example && w.trans && othersOf(w, pool, 'trans').length >= 3) t.push('exlisten');
     if (!choiceOnly) {
         const len = Array.from(w.kana).length;
         if (len >= 2 && len <= 8) t.push('build');
         t.push('type');
+        if (Array.isArray(w.chunks) && w.chunks.length >= 3) t.push('sentence');
     }
     return t;
 }
@@ -1627,6 +1685,8 @@ function makeChallenge(w, type, pool) {
         case 'listen': return { ...base, kind: 'choice', title: '聽聽看，客人說的是什麼意思？', big: '🔊', audio: w.word, audioOnly: true, options: meanOpts() };
         case 'reverse': return { ...base, kind: 'choice', title: '客人要找的是哪一件商品？', big: w.mean, options: opts(w.word, othersOf(w, pool, 'word'), true) };
         case 'reading': return { ...base, kind: 'choice', title: '這個字怎麼唸？', big: w.word, bigJp: true, options: opts(w.kana, othersOf(w, pool, 'kana'), true) };
+        case 'exlisten': return { ...base, kind: 'choice', title: '聽例句，選出正確的意思', big: '🔊', audio: w.example, audioOnly: true, answerText: `${w.example}＝${w.trans}`, options: opts(w.trans, othersOf(w, pool, 'trans'), false) };
+        case 'sentence': return { ...base, kind: 'build', small: true, title: '把這句話排出來', big: w.trans, answerText: `${w.example}＝${w.trans}`, target: [...w.chunks], tiles: shuffle([...w.chunks]), picked: [] };
         case 'build': {
             const target = Array.from(w.kana);
             const kata = /[ァ-ヺ]/.test(w.kana);
@@ -1669,8 +1729,8 @@ function renderChallenge() {
 function replayAudio(slow) { const ch = G.play?.queue[G.play.pos]; if (ch?.audio) speak(ch.audio, slow); }
 function renderBuild() {
     const ch = G.play.queue[G.play.pos];
-    $('slots').innerHTML = ch.target.map((_, i) => { const t = ch.picked[i]; return `<button class="slot ${t != null ? 'filled' : ''} bg-transparent border-0" style="border-bottom:4px solid ${t != null ? 'var(--blue)' : '#d9cbb6'}" onclick="unpickTile(${i})">${t != null ? esc(ch.tiles[t]) : ''}</button>`; }).join('');
-    $('tiles').innerHTML = ch.tiles.map((c, i) => `<button class="tile ${ch.picked.includes(i) ? 'used' : ''}" onclick="pickTile(${i})">${esc(c)}</button>`).join('');
+    $('slots').innerHTML = ch.target.map((_, i) => { const t = ch.picked[i]; return `<button class="slot ${t != null ? 'filled' : ''} bg-transparent border-0" style="${ch.small ? 'font-size:1.05rem;' : ''}border-bottom:4px solid ${t != null ? 'var(--blue)' : '#d9cbb6'}" onclick="unpickTile(${i})">${t != null ? esc(ch.tiles[t]) : ''}</button>`; }).join('');
+    $('tiles').innerHTML = ch.tiles.map((c, i) => `<button class="tile ${ch.picked.includes(i) ? 'used' : ''}" style="${ch.small ? 'font-size:1.05rem' : ''}" onclick="pickTile(${i})">${esc(c)}</button>`).join('');
     const btn = $('confirm-btn'); if (btn) btn.disabled = ch.picked.length < ch.target.length;
 }
 function pickTile(i) { const p = G.play, ch = p.queue[p.pos]; if (p.locked || ch.picked.includes(i) || ch.picked.length >= ch.target.length) return; ch.picked.push(i); playSound('tap'); renderBuild(); }
@@ -1684,13 +1744,13 @@ function submitType() {
 }
 function answerOption(i) {
     const p = G.play; if (!p || p.locked) return;
-    const ch = p.queue[p.pos], o = ch.options[i]; if (!o) return;
+    const ch = p.queue[p.pos], o = ch?.options?.[i]; if (!o) return;
     document.querySelectorAll('#play-body .opt').forEach((b, j) => { b.disabled = true; if (ch.options[j].ok) b.classList.add('ok'); else if (j === i) b.classList.add('bad'); });
     resolve(o.ok);
 }
 function startQTimer() {
     const p = G.play; if (p.timer) clearInterval(p.timer);
-    const total = 15000, t0 = Date.now();
+    const total = (hasPerk('ekiben') ? 20000 : 15000) + (p.hard ? 10000 : 0), t0 = Date.now();
     p.timer = setInterval(() => {
         const left = total - (Date.now() - t0), el = $('q-timer');
         if (el) el.style.width = Math.max(0, left / total * 100) + '%';
@@ -1802,7 +1862,7 @@ function nextIntro() {
     p.queue = [...shuffle(r1), ...shuffle(r2)];
     renderChallenge();
 }
-function withSay(ch) { ch.say = ch.w?.word; return ch; }
+function withSay(ch) { ch.say = ch.type === 'sentence' || ch.type === 'exlisten' ? ch.w.example : ch.w?.word; return ch; }
 
 // ---------- 複習 / 評論家 / 五十音 / 文法 ----------
 function startReview(kind) {
@@ -1816,19 +1876,30 @@ function startReview(kind) {
     G.play.queue = list.map(w => withSay(makeChallenge(w, pick(typesFor(w, pool)), pool)));
     openPlay(); renderChallenge();
 }
-function startCritic(id) {
+function criticMenu(id) {
+    const st = STREETS.find(s => s.id === id), pr = prog(id);
+    if (!pr.boss) return startCritic(id);
+    showModal(`<div class="text-center">${artHTML('critic_' + id, st.critic, 130)}
+        <h3 class="text-xl font-black mt-2">${st.criticName}</h3>
+        <p class="text-sm mt-1" style="color:var(--muted)">星級評鑑沒有選項可以選：全部要自己排假名、打字或排句子。通過後這條街會掛上星級標章。</p>
+        <button class="btn orange w-full mt-4" onclick="closeModal(); startCritic('${id}', true)">🌟 ${pr.star ? '再挑戰星級評鑑' : '挑戰星級評鑑'}</button>
+        <button class="btn white w-full mt-2" onclick="closeModal(); startCritic('${id}')">普通評鑑再來一次</button>
+        <button class="btn white w-full mt-2" onclick="closeModal()">關閉</button></div>`);
+}
+function startCritic(id, hard = false) {
     const street = STREETS.find(s => s.id === id);
     const words = streetWords(id);
     if (words.length < 4) return toast('這條街的商品太少，評論家還不想來。');
     const pool = wordPool([]);
-    G.play = makeRun('critic', { street, pool });
-    G.play.queue = shuffle(words).slice(0, 10).map(w => withSay(makeChallenge(w, pick(typesFor(w, pool, true)), pool)));
+    G.play = makeRun('critic', { street, pool, hard });
+    const pickType = w => hard ? pick(typesFor(w, pool).filter(t => ['build', 'type', 'sentence'].includes(t))) : pick(typesFor(w, pool, true));
+    G.play.queue = shuffle(words).slice(0, 10).map(w => withSay(makeChallenge(w, pickType(w), pool)));
     openPlay();
     $('play-head').innerHTML = `<button class="border-0 bg-transparent text-2xl font-black px-1" style="color:var(--muted)" onclick="closePlay()" aria-label="離開">✕</button>`;
     $('play-foot').innerHTML = `<button class="btn w-full text-lg red" onclick="renderChallenge()">接受評鑑！</button>`;
     $('play-body').innerHTML = `<div class="text-center pt-16 anim-in"><div class="reveal">${artHTML('critic_' + id, street.critic, 170)}</div>
-        <div class="text-2xl font-black mt-4">${street.criticName}來訪！</div>
-        <p class="mt-2" style="color:var(--muted)">共 ${G.play.queue.length} 題，每題 15 秒，答錯 3 次就會被打低分。</p></div>`;
+        <div class="text-2xl font-black mt-4">${hard ? '🌟 星級評鑑：' : ''}${street.criticName}來訪！</div>
+        <p class="mt-2" style="color:var(--muted)">共 ${G.play.queue.length} 題，每題 ${(hasPerk('ekiben') ? 20 : 15) + (hard ? 10 : 0)} 秒，答錯 3 次就會被打低分。${hard ? '這次沒有選項，全部要自己寫出來。' : ''}</p></div>`;
 }
 function kanaPool(script) {
     const ex = KANA_EXTRA[script];
@@ -1886,22 +1957,23 @@ function rushChallenge() {
     const p = G.play;
     if (p.kana) return makeKanaChallenge(pick(p.kana), p.kana);
     const w = pick(Object.values(S.dex));
-    const ch = makeChallenge(w, pick(typesFor(w, p.pool, true).filter(t => t !== 'listen')), p.pool);
+    const ch = makeChallenge(w, pick(typesFor(w, p.pool, true).filter(t => t !== 'listen' && t !== 'exlisten')), p.pool);
     delete ch.audio; return ch;
 }
 function startRush() {
     const p = G.play = makeRun('rush', { pool: wordPool([]) });
     if (dexCount() < 4) p.kana = kanaPool('hiragana');
-    p.endAt = Date.now() + 30000;
+    p.dur = hasPerk('yatai') ? 35000 : 30000;
+    p.endAt = Date.now() + p.dur;
     p.queue = [rushChallenge()];
     openPlay(); renderChallenge();
     p.timer = setInterval(() => {
         const left = p.endAt - Date.now(), el = $('play-bar');
-        if (el) el.style.width = Math.max(0, left / 30000 * 100) + '%';
+        if (el) el.style.width = Math.max(0, left / p.dur * 100) + '%';
         if (left <= 0) endRush();
     }, 100);
 }
-function nextRush() { const p = G.play; p.queue.push(rushChallenge()); p.pos++; renderChallenge(); const el = $('play-bar'); if (el) el.style.width = Math.max(0, (p.endAt - Date.now()) / 30000 * 100) + '%'; }
+function nextRush() { const p = G.play; p.queue.push(rushChallenge()); p.pos++; renderChallenge(); const el = $('play-bar'); if (el) el.style.width = Math.max(0, (p.endAt - Date.now()) / p.dur * 100) + '%'; }
 function endRush() {
     const p = G.play; if (!p || p.done) return;
     p.done = true; clearInterval(p.timer); p.timer = null;
@@ -1909,7 +1981,149 @@ function endRush() {
     setPop(s, popularity(s) + pop); S.coins += coins;
     const best = score > (S.best.rush || 0); if (best) S.best.rush = score;
     save(); playSound('win');
-    showResult({ icon: '📣', title: best && score ? '叫賣新紀錄！' : '叫賣結束！', lines: [`30 秒內答對 ${score} 題（最高 ${S.best.rush}）`, `😊 人氣 +${pop}`, `💴 +${coins}`] });
+    showResult({ icon: '📣', title: best && score ? '叫賣新紀錄！' : '叫賣結束！', lines: [`${p.dur / 1000} 秒內答對 ${score} 題（最高 ${S.best.rush}）`, `😊 人氣 +${pop}`, `💴 +${coins}`] });
+}
+
+// ---------- 接單（聽客人點的商品，從貨架上挑出來） ----------
+const ORDER_TIME = 20000;
+function startOrder() {
+    if (dexCount() < 6) return toast('商品帳至少要有 6 個單字才能接單，先去進貨吧 📦');
+    G.play = makeRun('order', { round: 0, total: 5, served: 0, coins: 0 });
+    openPlay(); nextOrder();
+}
+function nextOrder() {
+    const p = G.play; if (!p) return;
+    if (p.timer) { clearInterval(p.timer); p.timer = null; }
+    if (p.round >= p.total) return endOrder();
+    const shelf = [], seen = new Set();
+    for (const w of shuffle(Object.values(S.dex))) { if (seen.has(w.mean)) continue; seen.add(w.mean); shelf.push(w); if (shelf.length >= 6) break; }
+    if (shelf.length < 4) return endOrder();
+    p.round++;
+    const n = Math.min(shelf.length - 1, p.round >= 4 ? 3 : p.round >= 2 ? 2 : 1);
+    const st = pick(STREETS);
+    p.cur = { want: shelf.slice(0, n), shelf: shuffle(shelf), got: [], bad: [], miss: 0, guest: st };
+    p.cur.line = p.cur.want.map(w => w.word).join('、') + '、お願いします。';
+    p.locked = false;
+    renderOrder();
+    setTimeout(() => { if (G.play === p) speak(p.cur.line); }, 250);
+    const t0 = Date.now(), cur = p.cur;
+    p.timer = setInterval(() => {
+        const left = ORDER_TIME - (Date.now() - t0), el = $('q-timer');
+        if (el) el.style.width = Math.max(0, left / ORDER_TIME * 100) + '%';
+        if (left <= 0) {
+            clearInterval(p.timer); p.timer = null; p.locked = true;
+            toast('客人等太久，走掉了…', 'bad', 1400); playSound('bad');
+            setTimeout(() => { if (G.play === p && p.cur === cur) nextOrder(); }, 900);
+        }
+    }, 100);
+}
+function renderOrder() {
+    const p = G.play, c = p.cur;
+    $('play-head').innerHTML = `<button class="border-0 bg-transparent text-2xl font-black px-1" style="color:var(--muted)" onclick="quitPlay()" aria-label="離開">✕</button>
+        <div class="bar flex-1"><i style="width:${(p.round - 1) / p.total * 100}%"></i></div><span class="pill" style="background:#fff6d6;color:#a67c00">🛎️ ${p.served}/${p.total}</span>`;
+    $('play-body').innerHTML = `<div class="anim-in pt-2">
+        <div class="bar timer mb-3" style="height:8px"><i id="q-timer" style="width:100%"></i></div>
+        <div class="text-sm font-black mb-2" style="color:var(--muted)">第 ${p.round} 位客人・把客人要的 ${c.want.length} 件商品從貨架上挑出來</div>
+        <div class="flex items-end gap-2 mb-4">
+            <div>${artHTML('critic_' + c.guest.id, c.guest.critic, 84)}</div>
+            <button class="card p-3 flex-1 text-left" onclick="speak(G.play.cur.line)"><div class="jp font-black text-lg" style="word-break:break-word">🔊 ${esc(c.line)}</div><div class="text-xs mt-1" style="color:var(--muted)">點一下再聽一次</div></button>
+        </div>
+        <div class="grid grid-cols-2 gap-2">${c.shelf.map((w, i) => { const got = c.got.includes(i), bad = c.bad.includes(i); return `<button class="opt center ${got ? 'ok' : ''} ${bad ? 'bad' : ''}" ${got || bad ? 'disabled' : ''} onclick="pickOrder(${i})"><span>${esc(w.mean)}</span></button>`; }).join('')}</div></div>`;
+    $('play-foot').innerHTML = '';
+}
+function pickOrder(i) {
+    const p = G.play; if (!p || p.mode !== 'order' || p.locked) return;
+    const c = p.cur, w = c.shelf[i]; if (!w || c.got.includes(i) || c.bad.includes(i)) return;
+    S.totals.answered++; markActive(); ensureDaily();
+    if (c.want.includes(w)) {
+        c.got.push(i); S.totals.correct++; S.daily.correct++; progressLots(1);
+        const d = S.dex[w.word]; if (d) d.correct = (d.correct || 0) + 1;
+        playSound('ok');
+        if (c.got.length === c.want.length) {
+            p.locked = true; clearInterval(p.timer); p.timer = null;
+            const gain = c.want.length * 30 + (c.miss ? 0 : 20);
+            p.served++; p.coins += gain;
+            toast(c.miss ? `ありがとう！💴 +${gain}` : `完璧です！💴 +${gain}（含小費）`, 'good', 1200);
+            setTimeout(() => { if (G.play === p && p.cur === c) nextOrder(); }, 900);
+        }
+    } else { c.bad.push(i); c.miss++; playSound('bad'); buzz(50); }
+    save(); renderOrder();
+}
+function endOrder() {
+    const p = G.play, s = activeShop();
+    S.coins += p.coins; S.totals.orders = (S.totals.orders || 0) + p.served;
+    setPop(s, popularity(s) + p.served * 5); addBond(s, p.served);
+    const xp = gainXp(s, p.served * 3);
+    save(); playSound('win'); if (p.served === p.total) burst();
+    showResult({ icon: '🛎️', title: p.served === p.total ? '全部接待成功！' : '營業結束！', lines: [`接待了 ${p.served}/${p.total} 位客人`, `💴 +${p.coins}・⭐ 評價 +${xp}`, `😊 人氣 +${p.served * 5}`], again: 'startOrder()' });
+}
+
+// ---------- 陳列配對（翻牌：日文 ↔ 意思） ----------
+function startMatch() {
+    const ws = [], seen = new Set();
+    for (const w of shuffle(Object.values(S.dex))) { if (seen.has(w.mean) || seen.has(w.word)) continue; seen.add(w.mean); seen.add(w.word); ws.push(w); if (ws.length >= 6) break; }
+    let pairs;
+    if (ws.length >= 6) pairs = ws.map(w => [w.word, w.mean, w.word]);
+    else { const ks = [], sr = new Set(); for (const k of shuffle(kanaPool('hiragana'))) { if (sr.has(k.romaji)) continue; sr.add(k.romaji); ks.push(k); if (ks.length >= 6) break; } pairs = ks.map(k => [k.kana, k.romaji, k.kana]); }
+    const cards = shuffle(pairs.flatMap(([a, b, say], id) => [{ id, text: a, jp: true, say }, { id, text: b, jp: false }]));
+    G.play = makeRun('match', { cards, open: [], doneIdx: [], moves: 0, kanaOnly: ws.length < 6 });
+    openPlay();
+    $('play-foot').innerHTML = '';
+    $('play-body').innerHTML = `<div class="anim-in pt-2"><div class="text-sm font-black mb-3" style="color:var(--muted)">把${G.play.kanaOnly ? '假名和讀音' : '商品和它的意思'}配成一對（商品帳滿 6 個單字後會改用你的單字）</div>
+        <div class="grid gap-2" style="grid-template-columns:repeat(3, minmax(0, 1fr))">${cards.map((c, i) => `<button class="mcard" data-i="${i}" onclick="flipMatch(${i})"><div class="mcard-in"><div class="mface mback" style="background:var(--pri);box-shadow:0 4px 0 var(--pri-d)">🏮</div><div class="mface mfront ${c.jp ? 'jp' : ''}" style="${c.jp ? 'font-size:1.15rem' : ''}">${esc(c.text)}</div></div></button>`).join('')}</div></div>`;
+    syncMatch();
+}
+function syncMatch() {
+    const p = G.play;
+    $('play-head').innerHTML = `<button class="border-0 bg-transparent text-2xl font-black px-1" style="color:var(--muted)" onclick="quitPlay()" aria-label="離開">✕</button>
+        <div class="bar flex-1"><i style="width:${p.doneIdx.length / p.cards.length * 100}%"></i></div><span class="pill" style="background:#fff6d6;color:#a67c00">🃏 ${p.moves} 步</span>`;
+    document.querySelectorAll('#play-body .mcard').forEach((el, i) => {
+        const done = p.doneIdx.includes(i);
+        el.classList.toggle('flip', done || p.open.includes(i));
+        el.classList.toggle('done', done);
+    });
+}
+function flipMatch(i) {
+    const p = G.play; if (!p || p.mode !== 'match' || p.locked || p.open.includes(i) || p.doneIdx.includes(i)) return;
+    p.open.push(i); playSound('tap');
+    const c = p.cards[i]; if (c.say) speak(c.say);
+    if (p.open.length === 2) {
+        p.moves++;
+        const [a, b] = p.open;
+        if (p.cards[a].id === p.cards[b].id) {
+            p.doneIdx.push(a, b); p.open = []; playSound('ok');
+            if (p.doneIdx.length === p.cards.length) { p.locked = true; setTimeout(() => { if (G.play === p) endMatch(); }, 700); }
+        } else {
+            p.locked = true;
+            setTimeout(() => { if (G.play !== p) return; p.open = []; p.locked = false; syncMatch(); }, 900);
+        }
+    }
+    syncMatch();
+}
+function endMatch() {
+    const p = G.play, s = activeShop();
+    const coins = Math.max(30, 150 - (p.moves - 6) * 10);
+    S.coins += coins; S.totals.matches = (S.totals.matches || 0) + 1;
+    setFresh(s, freshness(s) + 10);
+    const xp = gainXp(s, 4);
+    markActive(); save(); playSound('win'); if (p.moves <= 8) burst();
+    showResult({ icon: '🃏', title: '陳列完成！', lines: [`用了 ${p.moves} 步（最少 6 步）`, `💴 +${coins}・⭐ 評價 +${xp}`, '🍙 新鮮度 +10'], again: 'startMatch()' });
+}
+
+// ---------- 每日開店獎勵 ----------
+function checkLogin() {
+    ensureDaily();
+    if (S.daily.login || !S.shops.length) return;
+    S.daily.login = true;
+    const day = (S.lastActive === yesterday() ? S.streak : 0) + 1;
+    const coins = 50 + Math.min(day, 7) * 20;
+    S.coins += coins; S.supplies.rice = (S.supplies.rice || 0) + 1;
+    save();
+    queueModal(() => { showModal(`<div class="text-center"><div class="text-6xl">🏮</div>
+        <h3 class="text-2xl font-black mt-2">今日開店！</h3>
+        <p class="mt-1" style="color:var(--muted)">${day > 1 ? `已經連續第 ${day} 天，今天答一題就能延續紀錄` : '每天來開店都有獎勵，連續越多天越多（最多 7 天）'}</p>
+        <div class="mt-3 font-black space-y-1"><div>💴 +${coins}</div><div>🍙 基本食材 ×1</div></div>
+        <button class="btn w-full mt-4" onclick="closeModal()">開始營業</button></div>`); playSound('coin'); });
 }
 
 // ---------- 結算 ----------
@@ -1934,7 +2148,7 @@ function finishRun() {
         const fresh = p.words.filter(w => !S.dex[w.word]);
         const today = dateStr();
         for (const w of fresh) S.dex[w.word] = { ...w, street: p.street.id, caught: today, correct: 1, wrong: 0, box: 1, due: addDays(1), needFix: false };
-        const coins = 100 + stars * 50 + (p.maxCombo >= 5 ? 100 : 0);
+        const coins = Math.round((100 + stars * 50 + (p.maxCombo >= 5 ? 100 : 0)) * (hasPerk('konbini') ? 1.2 : 1));
         const xp = gainXp(s, fresh.length * 8 + stars * 4);
         S.coins += coins; S.supplies.rice = (S.supplies.rice || 0) + fresh.length;
         S.daily.new += fresh.length; S.totals.stages++; if (stars === 3) S.totals.perfect++;
@@ -1944,7 +2158,16 @@ function finishRun() {
     }
     if (p.mode === 'critic') {
         const win = p.hearts > 0, pr = prog(p.street.id);
-        if (!win) { save(); playSound('bad'); return showResult({ icon: '😣', title: `${p.street.criticName}搖了搖頭…`, lines: ['多盤點幾次這條街的商品，再來挑戰吧。'], again: `startCritic('${p.street.id}')` }); }
+        if (!win) { save(); playSound('bad'); return showResult({ icon: '😣', title: `${p.street.criticName}搖了搖頭…`, lines: ['多盤點幾次這條街的商品，再來挑戰吧。'], again: `startCritic('${p.street.id}', ${!!p.hard})` }); }
+        if (p.hard) {
+            const firstStar = !pr.star; pr.star = true;
+            const coins = firstStar ? 1500 : 200, xp = gainXp(s, firstStar ? 100 : 20);
+            S.coins += coins;
+            const lines = [`💴 +${coins}`, `⭐ 評價 +${xp}`];
+            if (firstStar) { S.totals.stars = (S.totals.stars || 0) + 1; S.supplies.wagyu = (S.supplies.wagyu || 0) + 2; lines.push('🥩 頂級和牛 ×2'); }
+            save(); playSound('win'); burst();
+            return showResult({ icon: '🌟', title: `${p.street.name}拿到星級評鑑！`, lines });
+        }
         const first = !pr.boss; pr.boss = true;
         const coins = first ? 800 : 150, xp = gainXp(s, first ? 60 : 15);
         S.coins += coins;
@@ -1960,7 +2183,7 @@ function finishRun() {
     }
     const n = p.first;
     if (p.mode === 'review') {
-        const coins = n * 10, xp = gainXp(s, n * 2);
+        const coins = n * 10 * (hasPerk('sushi') ? 2 : 1), xp = gainXp(s, n * 2);
         S.coins += coins; setFresh(s, freshness(s) + n * 3);
         save(); playSound('win');
         return showResult({ icon: '📚', title: '盤點完成！', lines: [`第一次就答對 ${n}/${p.queue.filter(c => !c.retry).length} 題`, `💴 +${coins}・⭐ 評價 +${xp}`, `🍙 新鮮度 +${n * 3}`] });
@@ -2012,7 +2235,7 @@ function openLot(id) {
     const type = pick(SHOP_TYPES.filter(t => !owned.has(t.id)).length ? SHOP_TYPES.filter(t => !owned.has(t.id)) : SHOP_TYPES);
     G.newType = type.id;
     showModal(`<div class="text-center"><div class="reveal">${artHTML(`shop_${type.id}_1`, type.e, 150)}</div>
-        <h3 class="text-2xl font-black mt-3">新店開張：${type.name}！</h3><p class="text-sm mt-1" style="color:var(--muted)">幫它取個店名吧</p>
+        <h3 class="text-2xl font-black mt-3">新店開張：${type.name}！</h3><div class="pill mt-2" style="background:var(--pri-t);color:var(--pri-d)">✨ 特性：${PERKS[type.id]}</div><p class="text-sm mt-2" style="color:var(--muted)">幫它取個店名吧</p>
         <input id="new-name" class="field text-center mt-3" maxlength="12" value="${esc(type.tiers[0])}">
         <button class="btn w-full mt-3" onclick="confirmLot('${id}')">開張！</button></div>`, { sticky: true });
     playSound('win'); burst();
@@ -2029,6 +2252,7 @@ function openShopInfo(id) {
     showModal(`<div class="text-center">${shopArt(s, 140)}
         <h3 class="text-2xl font-black mt-2">${esc(s.name)}</h3>
         <div class="text-sm" style="color:var(--muted)">${typeOf(s).name}・Lv.${li.lv} ${tierName(s)}${nt ? `・Lv.${nt} 改裝` : '・最終階段'}</div>
+        <div class="pill mt-2" style="background:var(--pri-t);color:var(--pri-d)">✨ 特性：${PERKS[s.type]}</div>
         <div class="grid grid-cols-3 gap-2 mt-3 text-sm">
             <div class="card p-2"><div class="font-black">${freshness(s)}%</div><div class="text-xs" style="color:var(--muted)">🍙 新鮮度</div></div>
             <div class="card p-2"><div class="font-black">${popularity(s)}%</div><div class="text-xs" style="color:var(--muted)">😊 人氣</div></div>
@@ -2300,9 +2524,10 @@ function finishWelcome() {
     const name = ($('w-name')?.value || '').trim() || 'まいど屋';
     S.level = $('w-level')?.value || 'N5';
     const shop = newShop('yatai', name.slice(0, 12));
-    S.shops.push(shop); S.active = shop.id;
+    S.shops.push(shop); S.active = shop.id; S.lastCollect = Date.now();
     save(); closeModal(); render(); burst();
     if (S.migrated) { delete S.migrated; save(); toast('已把舊版 LinguaMax 的經驗值換成日圓，學過的單字不會重複出現。', 'gold', 5000); }
+    checkLogin();
     if (S.level === 'N5') toast('還不熟五十音的話，先到「五十音」道場練練 🈁', 'info', 5000);
 }
 
@@ -2326,7 +2551,7 @@ setInterval(() => { if (G.tab === 'home' && !G.play && !G.modalOpen && document.
 ensureDaily();
 fluentify(document.body);
 render();
-if (!S.shops.length) openWelcome();
+if (!S.shops.length) openWelcome(); else checkLogin();
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
