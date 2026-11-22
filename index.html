@@ -432,6 +432,19 @@ const LEVELS = {
     N1: { label: 'N1 高級', desc: 'advanced reading and professional settings; nuanced, idiomatic language', focus: 'Include nuanced or idiomatic expressions.' }
 };
 
+// 風格：和難度分開的第二個設定，決定同一個主題下偏向哪一種用語
+const STYLES = {
+    general: { label: '一般', hint: '不特別偏向，均衡出題', focus: '' },
+    travel: { label: '旅遊生存', hint: '交通、購物、住宿、求助，馬上用得到的短句', focus: 'Bias toward what a traveller in Japan needs: transport, shopping, hotels, asking for help. Prefer short phrases that can be used immediately.' },
+    biz: { label: '商務敬語', hint: '職場用語與敬語：電話、會議、接待客戶', focus: 'Bias toward workplace Japanese and keigo (尊敬語・謙譲語・丁寧語): phone calls, meetings, handling customers, cushion phrases. Write examples in a polite business register.' },
+    casual: { label: '口語俗語', hint: '朋友之間的說法：普通形、縮約、常見俗語', focus: 'Bias toward casual spoken Japanese between friends: plain form, contractions, common slang and net slang. Mention in "notes" when something is too casual for formal settings.' },
+    it: { label: 'IT／工程', hint: '軟體開發與科技職場的用語', focus: 'Bias toward software and IT workplace Japanese: development collaboration, requirements, simple technical terms and katakana loanwords.' },
+    convo: { label: '會話優先', hint: '可以直接複誦的短句、附和與固定說法', focus: 'Prioritise short, repeatable conversational chunks and natural responses (aizuchi, set phrases) over isolated nouns.' }
+};
+const styleOf = () => STYLES[S.style] || STYLES.general;
+// 接在出題提示的程度說明後面；「一般」不加任何東西
+const styleLine = () => (styleOf().focus ? `\nStyle focus (${S.style}): ${styleOf().focus} Stay within the given topic and level; let this focus decide which items you choose and how the examples are phrased.` : '');
+
 // 街區：每條街 5 關進貨 + 1 位評論家
 const STREETS = [
     { id: 'aisatsu', name: '入門橫丁', emoji: '🙌', topic: 'Greetings and self introduction in Japanese', c: '#e8703a', cd: '#b9501f', t: '#fdeadc', critic: '🙇', criticName: '禮儀老師' },
@@ -963,7 +976,7 @@ function burst() { try { window.confetti?.({ particleCount: 70, spread: 70, orig
 // ============================================================
 function defaultState() {
     return {
-        v: 1, level: 'N5', coins: 300, streak: 0, lastActive: '', sound: true, rate: 1, fluent: true,
+        v: 1, level: 'N5', style: 'general', coins: 300, streak: 0, lastActive: '', sound: true, rate: 1, fluent: true,
         shops: [], active: null, lots: [], supplies: { rice: 3 }, bg: 'sunny', bgs: ['sunny'], lastClean: 0,
         progress: {}, dex: {}, legacy: [], grammarSeen: [],
         daily: { date: '', new: 0, correct: 0, chat: 0, claimed: [] },
@@ -984,6 +997,7 @@ function loadState() {
         if (!s.dex || typeof s.dex !== 'object') s.dex = {};
         if (!s.progress || typeof s.progress !== 'object') s.progress = {};
         if (!LEVELS[s.level]) s.level = 'N5';
+        if (!STYLES[s.style]) s.style = 'general';
         if (!s.lastCollect) s.lastCollect = Date.now();
         if (!s.staff || typeof s.staff !== 'object' || Array.isArray(s.staff)) s.staff = {};
         if (!s.skills || typeof s.skills !== 'object' || Array.isArray(s.skills)) s.skills = {};
@@ -1599,7 +1613,7 @@ const lv = () => LEVELS[S.level] || LEVELS.N5;
 
 function vocabPrompt(street, exclude) {
     return `Create ${WORDS_PER_STAGE} Japanese vocabulary items for the topic "${street.topic}".
-Learner level: JLPT ${S.level} — ${lv().desc}. ${lv().focus}
+Learner level: JLPT ${S.level} — ${lv().desc}. ${lv().focus}${styleLine()}
 (variation #${Math.floor(Math.random() * 1e6)})
 
 Rules:
@@ -1620,7 +1634,7 @@ JSON shape:
 
 function grammarPrompt(topic, seen) {
     return `Create a short Japanese grammar lesson about "${topic.value}" (${topic.label}) with 5 multiple-choice questions.
-Learner level: JLPT ${S.level} — ${lv().desc}.
+Learner level: JLPT ${S.level} — ${lv().desc}.${styleLine()}
 (variation #${Math.floor(Math.random() * 1e6)})
 
 Rules:
@@ -1638,7 +1652,7 @@ function chatSystem(sc, opening) {
     return `You are a friendly Japanese conversation partner for a Traditional Chinese (Taiwan) speaker.
 Role-play scenario: "${sc.value}" (${sc.label}). Stay in character as the other person (staff, friend, colleague…).
 You have already opened the conversation with: 「${opening}」
-Learner level: JLPT ${S.level} — ${lv().desc}. Keep replies to 1-2 short sentences at this level.
+Learner level: JLPT ${S.level} — ${lv().desc}. Keep replies to 1-2 short sentences at this level.${styleLine()}
 All Chinese must be natural Traditional Chinese (繁體中文, Taiwan).
 
 User turns are labelled [JAPANESE] or [CHINESE].
@@ -1952,7 +1966,7 @@ function renderMap() {
     <div class="card p-4 anim-in" style="background:${r.t};border-color:${r.c}55">
         <div class="flex items-center gap-3">
             <div class="text-4xl">${r.emoji}</div>
-            <div class="flex-1"><div class="text-xs font-black" style="color:${r.cd}">第 ${ri + 1} 街</div><div class="text-xl font-black">${r.name}</div><div class="text-xs" style="color:var(--muted)">${LEVELS[S.level].label} · 評論家：${r.criticName}</div></div>
+            <div class="flex-1"><div class="text-xs font-black" style="color:${r.cd}">第 ${ri + 1} 街</div><div class="text-xl font-black">${r.name}</div><div class="text-xs" style="color:var(--muted)">${LEVELS[S.level].label}${S.style !== 'general' ? '・' + styleOf().label : ''} · 評論家：${r.criticName}</div></div>
             <div class="text-right"><div class="font-black">⭐ ${totalStars}/${STAGES_PER_STREET * 3}</div><div class="text-xs" style="color:var(--muted)">📒 ${streetWords(r.id).length} 個</div></div>
         </div>
     </div>
@@ -2811,8 +2825,11 @@ function renderMe() {
             <span class="b-ico" style="${got ? '' : 'filter:grayscale(1);opacity:.45'}">${a.icon}</span><span class="b-name">${a.name}</span>
             ${got ? '' : `<span class="b-bar"><i style="width:${Math.min(100, v / a.goal * 100)}%"></i></span>`}</button>`; }).join('')}</div></div>
     <div class="card p-4 mt-4 space-y-3"><h3 class="font-black text-lg">⚙️ 設定</h3>
-        <label class="block"><span class="text-sm">日語程度（影響進貨、文法與會話的難度）</span>
+        <label class="block"><span class="text-sm">難度（單字、文法與會話有多難）</span>
             <select class="field mt-1" onchange="S.level=this.value; G.prefetch={}; save()">${Object.entries(LEVELS).map(([k, v]) => `<option value="${k}" ${S.level === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label>
+        <label class="block"><span class="text-sm">風格（同樣的難度下，偏向哪一種用語）</span>
+            <select class="field mt-1" onchange="S.style=this.value; G.prefetch={}; save(); renderMe()">${Object.entries(STYLES).map(([k, v]) => `<option value="${k}" ${S.style === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select>
+            <span class="block text-xs mt-1" style="color:var(--muted)">${styleOf().hint}。改了之後，下一關進貨、下一份文法講義和下一段會話開始生效；已經學過的單字不會變。</span></label>
         <label class="block"><span class="text-sm">發音語速</span>
             <select class="field mt-1" onchange="S.rate=Number(this.value); save(); speak('こんにちは')">${[[.7, '慢'], [.85, '稍慢'], [1, '正常'], [1.15, '稍快']].map(([v, l]) => `<option value="${v}" ${S.rate === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <div class="grid grid-cols-2 gap-2">
@@ -2908,7 +2925,7 @@ function confirmReset(kind) {
 function doReset(kind) {
     try {
         if (kind === 'shop') {
-            const keep = { level: S.level, sound: S.sound, rate: S.rate, fluent: S.fluent, dex: S.dex, legacy: S.legacy, grammarSeen: S.grammarSeen, installHide: S.installHide, tutorial: S.tutorial };
+            const keep = { level: S.level, style: S.style, sound: S.sound, rate: S.rate, fluent: S.fluent, dex: S.dex, legacy: S.legacy, grammarSeen: S.grammarSeen, installHide: S.installHide, tutorial: S.tutorial };
             localStorage.setItem(STORE_KEY, JSON.stringify({ ...defaultState(), ...keep }));
         } else localStorage.removeItem(STORE_KEY);
     } catch {}
@@ -3018,13 +3035,17 @@ function openWelcome() {
         <h3 class="text-2xl font-black mt-2">歡迎來到商店街！</h3>
         <p class="text-sm mt-2" style="color:var(--muted)">你頂下了一台路邊屋台。學日文單字就是「進貨」，複習就是「盤點」，把小攤子經營成一整條商店街吧。</p>
         <label class="block text-left mt-4"><span class="text-sm">店名</span><input id="w-name" class="field mt-1 jp" maxlength="12" value="まいど屋"></label>
-        <label class="block text-left mt-3"><span class="text-sm">你的日語程度</span>
+        <label class="block text-left mt-3"><span class="text-sm">難度</span>
             <select id="w-level" class="field mt-1">${Object.entries(LEVELS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+        <label class="block text-left mt-3"><span class="text-sm">風格</span>
+            <select id="w-style" class="field mt-1">${Object.entries(STYLES).map(([k, v]) => `<option value="${k}">${v.label}・${v.hint}</option>`).join('')}</select></label>
+        <p class="text-xs text-left mt-2" style="color:var(--muted)">兩個都可以之後在「我的」分頁更改。</p>
         <button class="btn w-full mt-4 text-lg" onclick="finishWelcome()">開張！</button></div>`, { sticky: true });
 }
 function finishWelcome() {
     const name = ($('w-name')?.value || '').trim() || 'まいど屋';
     S.level = $('w-level')?.value || 'N5';
+    S.style = STYLES[$('w-style')?.value] ? $('w-style').value : 'general';
     const shop = newShop('yatai', name.slice(0, 12));
     S.shops.push(shop); S.active = shop.id; S.lastCollect = Date.now();
     save(); closeModal(); render(); burst(); if (!S.tutorial) startTour();
