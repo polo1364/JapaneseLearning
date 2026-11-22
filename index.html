@@ -330,6 +330,10 @@
         .rec { animation: ring 1.2s ease-out infinite; }
 
         /* tailwind.css 沒有的小工具類別 */
+        /* 新手教學 */
+        .tour-block { position: fixed; inset: 0; z-index: 80; }
+        .tour-hole { position: fixed; z-index: 81; border-radius: 18px; pointer-events: none; transition: all .25s; box-shadow: 0 0 0 3px var(--gold), 0 0 0 9999px rgba(58, 42, 34, .62); }
+        .tour-tip { position: fixed; z-index: 82; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); max-width: 34rem; }
         .line-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .border-2 { border-width: 2px; border-style: solid; }
         .col-span-2 { grid-column: span 2 / span 2; }
@@ -1473,7 +1477,7 @@ function closeModal() {
     $('modal-root').innerHTML = ''; G.modalOpen = false; G.modalSticky = false;
     flushModals();
 }
-function flushModals() { if (!G.modalOpen && !G.play && G.modalQueue.length) G.modalQueue.shift()(); }
+function flushModals() { if (!G.modalOpen && !G.play && !G.tour && G.modalQueue.length) G.modalQueue.shift()(); }
 function queueModal(fn) { G.modalQueue.push(fn); setTimeout(flushModals, 0); }
 
 // ============================================================
@@ -1543,16 +1547,16 @@ function renderHome() {
         <div id="shop-stage" class="py-2 relative select-none text-center">${shopHTML(s, 150)}</div>
         <p class="text-[11px] text-center relative" style="color:${bg.dark ? '#fff' : 'var(--muted)'}">點一下店面，聽聽店裡的招呼聲</p>
         <div id="home-stats" class="relative rounded-2xl p-3 mt-2" style="background:rgba(255,255,255,.88)"></div>
-        <div class="grid grid-cols-4 gap-2 mt-3 relative">
+        <div id="home-acts" class="grid grid-cols-4 gap-2 mt-3 relative">
             <button class="act" onclick="openRestock()"><span class="i">🍙</span>補貨</button>
             <button class="act" onclick="cleanShop()"><span class="i">🧹</span>${cleanLeft ? Math.ceil(cleanLeft / 60000) + ' 分' : '打掃'}</button>
             <button class="act" onclick="startRush()"><span class="i">📣</span>叫賣</button>
             <button class="act" onclick="G.shopTab='deco'; openShop()"><span class="i">🎐</span>裝潢</button>
         </div>
-        <button class="btn w-full mt-4 text-lg relative" style="--c:${st.c};--cd:${st.cd}" onclick="goStock()">📦 去進貨（學新單字）</button>
+        <button id="home-stock" class="btn w-full mt-4 text-lg relative" style="--c:${st.c};--cd:${st.cd}" onclick="goStock()">📦 去進貨（學新單字）</button>
     </div>
 
-    <div class="card p-4 mt-4">
+    <div id="home-open" class="card p-4 mt-4">
         <div class="flex items-center justify-between mb-3"><h3 class="font-black text-lg">🛎️ 今日營業</h3><span class="text-xs" style="color:var(--muted)">不需要網路</span></div>
         <div class="grid grid-cols-2 gap-2">
             <button class="card p-3 text-left" style="background:var(--orange-t);border-color:#f6d9a8" onclick="startOrder()"><div class="text-3xl">🛎️</div><div class="font-black mt-1">接單</div><div class="text-xs" style="color:var(--muted)">聽客人點什麼，從貨架挑出來。賺日圓、人氣和常客</div></button>
@@ -1560,7 +1564,7 @@ function renderHome() {
         </div>
     </div>
 
-    <div class="card p-4 mt-4">
+    <div id="home-town" class="card p-4 mt-4">
         <div class="flex items-center justify-between mb-3"><h3 class="font-black text-lg">🏘️ 我的商店街 <span class="text-sm" style="color:var(--muted)">${S.shops.length} 間</span></h3>
             <button class="btn sm orange" onclick="G.shopTab='lot'; openShop()">🪧 租店面</button></div>
         <div class="rounded-2xl p-3 mb-3" style="background:#fbf6ee">
@@ -1713,7 +1717,7 @@ function renderMap() {
     </div>
     <div class="relative pt-12 pb-6 mt-3 overflow-hidden trail" style="--rt:${r.t}">${nodes}${bossNode}</div>
     ${p.boss && ri + 1 < STREETS.length ? `<button class="btn w-full mb-3" style="--c:${STREETS[ri + 1].c};--cd:${STREETS[ri + 1].cd}" onclick="selectStreet(${ri + 1})">前往下一條街：${STREETS[ri + 1].emoji} ${STREETS[ri + 1].name} →</button>` : ''}
-    <div class="card p-4 mt-2">
+    <div id="map-dojo" class="card p-4 mt-2">
         <div class="flex items-center gap-3 mb-3"><div class="text-3xl">🏯</div><div><div class="font-black text-lg">文法道場</div><div class="text-xs" style="color:var(--muted)">每次 5 題，答對拿日圓</div></div></div>
         <div class="grid grid-cols-2 gap-2">${gram.map((g, i) => `<button class="btn white sm jp" style="justify-content:flex-start;text-align:left" onclick="startGrammar(${i})">${esc(g.label)}</button>`).join('')}</div>
         <button class="btn white sm w-full mt-2" onclick="G.gramAll=!G.gramAll; renderMap()">${G.gramAll ? '收合' : `顯示全部 ${GRAMMAR_TOPICS.length} 個主題`}</button>
@@ -2567,8 +2571,9 @@ function renderMe() {
         <div class="grid grid-cols-2 gap-2">
             <button class="btn white sm" onclick="S.sound=!S.sound; save(); renderMe()">${S.sound ? '🔊 音效：開' : '🔇 音效：關'}</button>
             <button class="btn white sm" onclick="S.fluent=!(S.fluent !== false); save(); location.reload()">🎨 3D 圖示：${S.fluent !== false ? '開' : '關'}</button>
-        </div></div>
-    <div class="card p-4 mt-4"><h3 class="font-black text-lg">🔑 Claude API</h3>
+        </div>
+        <button class="btn white sm w-full" onclick="startTour()">📖 重看新手教學</button></div>
+    <div id="me-api" class="card p-4 mt-4"><h3 class="font-black text-lg">🔑 Claude API</h3>
         <p class="text-sm mt-1" style="color:var(--muted)">${apiKey ? `已設定 Key（…${esc(apiKey.slice(-4))}）` : '尚未設定 Key，進貨、文法與會話需要它。'}</p>
         <label class="block mt-2"><span class="text-sm">模型</span>
             <select class="field mt-1" onchange="model=this.value; safeSet(MODEL_STORE, model); G.prefetch={}">${MODELS.map(([id, l]) => `<option value="${id}" ${model === id ? 'selected' : ''}>${l}</option>`).join('')}${known ? '' : `<option value="${esc(model)}" selected>${esc(model)}</option>`}</select></label>
@@ -2627,6 +2632,83 @@ function saveKey() {
 }
 
 // ============================================================
+// 新手教學：逐步聚光導覽，第一次開店後自動開始，也可以在「我的」重看
+// ============================================================
+const TOUR = [
+    { tab: 'home', sel: '#shop-stage', title: '這是你的店', text: '一切從這台屋台開始，點店面可以聽店裡的招呼聲。答題會拿到「評價」，評價夠了店鋪就升級，Lv.5 和 Lv.10 各改裝一次。' },
+    { tab: 'home', sel: '#home-stats', title: '四項數值', text: '⭐ 評價是店鋪的經驗值。🍙 新鮮度和 😊 人氣會隨時間下降：新鮮度太低評價減半，人氣高則有加成。💞 常客靠進貨、打掃和會話累積。' },
+    { tab: 'home', sel: '#home-acts', title: '照顧店鋪', text: '🍙 補貨：用食材補新鮮度。🧹 打掃：每 30 分鐘一次，補人氣。📣 叫賣：30 秒快問快答。🎐 裝潢：換店面背景。' },
+    { tab: 'home', sel: '#home-stock', title: '進貨＝學新單字', text: '這是最主要的玩法。每一關 Claude 會出 5 個新單字，先看商品卡，再答 10 題。需要先設定 Claude API Key（最後一步會帶你去）。' },
+    { tab: 'home', sel: '#home-open', title: '今日營業', text: '學到單字後就能玩，兩個都不需要網路。🛎️ 接單：聽客人用日文點什麼，從貨架挑出來。🃏 陳列配對：翻牌把商品和意思配成對。' },
+    { tab: 'home', sel: '#home-town', title: '我的商店街', text: '你不在的時候店鋪照常營業，回來記得按「收款」。之後可以租空店面開新店，每種店有不同特性。點任何一間店，可以升級設備、派店員、把單字上架。' },
+    { tab: 'map', sel: '.trail', title: '商店街地圖', text: '共 16 條街，每條街 5 關進貨。全部完成後評論家會來評鑑，通過就解鎖下一條街、送一間空店面，那位評論家也會成為可以派駐的店員。' },
+    { tab: 'map', sel: '#map-dojo', title: '文法道場', text: '每次一份講義加 5 題。往下還有五十音道場，不需要網路；還不熟假名的話，建議先從那裡開始。' },
+    { tab: 'dex', sel: '#tab-dex', title: '商品帳', text: '學過的單字都收在這裡，會依 1・3・7・14・30 天排入「盤點」（複習）。到期沒盤點，上架的商品就會過期。這一頁也有完整的五十音表。' },
+    { tab: 'chat', sel: '#tab-chat', title: '會話', text: '選一個情境，和 AI 用日文對話。打日文會得到評分和日圓；不會說就直接打中文，對方會教你怎麼說。' },
+    { tab: 'me', sel: '#me-api', title: '設定 API Key', text: '進貨、文法和會話都需要 Claude API Key，在這裡設定。成就、日語程度、發音語速和存檔匯出也都在這一頁。' }
+];
+function startTour() {
+    if (G.play || !S.shops.length) return;
+    if (G.modalOpen) { $('modal-root').innerHTML = ''; G.modalOpen = false; G.modalSticky = false; }
+    G.tour = { i: 0 };
+    let root = $('tour');
+    if (!root) { root = document.createElement('div'); root.id = 'tour'; document.body.appendChild(root); }
+    root.innerHTML = '<div class="tour-block"></div><div class="tour-hole" id="tour-hole"></div><div class="tour-tip" id="tour-tip"></div>';
+    showTourStep();
+}
+function showTourStep() {
+    const t = G.tour; if (!t) return;
+    const st = TOUR[t.i];
+    if (G.tab !== st.tab) switchTab(st.tab);
+    const el = document.querySelector(st.sel);
+    const hole = $('tour-hole'), tip = $('tour-tip');
+    const vh = window.innerHeight, vw = window.innerWidth, pad = 6;
+    let y = vh * .3, hgt = 0, below = true;
+    if (el) {
+        window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - 110) });
+        const r = el.getBoundingClientRect();
+        y = Math.max(4, r.top - pad); hgt = Math.min(r.height + pad * 2, vh * .4);
+        const x = Math.max(4, r.left - pad), w = Math.min(vw - 8 - (x - 4), r.width + pad * 2);
+        hole.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${hgt}px`;
+        below = y + hgt / 2 < vh * .5;
+    } else hole.style.cssText = 'left:50%;top:30%;width:0;height:0';
+    tip.style.top = below ? Math.min(y + hgt + 12, vh - 220) + 'px' : '';
+    tip.style.bottom = below ? '' : Math.min(vh - y + 12, vh - 220) + 'px';
+    const last = t.i === TOUR.length - 1;
+    tip.innerHTML = `<div class="card p-4 shadow-lg">
+        <div class="flex items-center justify-between"><span class="text-xs font-black" style="color:var(--pri-d)">新手教學 ${t.i + 1}/${TOUR.length}</span><button class="border-0 bg-transparent text-xs font-black" style="color:var(--muted)" onclick="endTour(false)">跳過教學</button></div>
+        <div class="font-black text-lg mt-1">${st.title}</div>
+        <p class="text-sm mt-1 leading-relaxed">${st.text}</p>
+        <div class="bar mt-3" style="height:6px"><i style="width:${(t.i + 1) / TOUR.length * 100}%;background:var(--pri)"></i></div>
+        <div class="flex gap-2 mt-3">${t.i ? '<button class="btn white sm" onclick="tourGo(-1)">← 上一步</button>' : ''}<button class="btn sm flex-1" onclick="tourGo(1)">${last ? '完成 ✓' : '下一步 →'}</button></div></div>`;
+}
+function tourGo(d) {
+    const t = G.tour; if (!t) return;
+    playSound('tap');
+    if (t.i + d >= TOUR.length) return endTour(true);
+    t.i = Math.max(0, t.i + d);
+    showTourStep();
+}
+function endTour(done) {
+    if (!G.tour) return;
+    G.tour = null; $('tour')?.remove();
+    const first = !S.tutorial;
+    S.tutorial = true;
+    if (done && first) S.coins += 200;
+    save(); switchTab('home');
+    if (!done) return flushModals();
+    playSound('win'); burst();
+    showModal(`<div class="text-center"><div class="text-6xl">🎉</div>
+        <h3 class="text-2xl font-black mt-2">教學完成！</h3>
+        ${first ? '<div class="font-black mt-2">💴 +200 開店資金</div>' : ''}
+        <p class="text-sm mt-2" style="color:var(--muted)">${apiKey ? '可以開始進貨了。隨時能在「我的」分頁重看教學。' : '接下來建議先設定 API Key 才能進貨；還不熟假名的話，五十音道場不用 Key 就能練。隨時能在「我的」分頁重看教學。'}</p>
+        ${apiKey ? '' : '<button class="btn w-full mt-4" onclick="G.modalQueue.push(openKeyModal); closeModal()">🔑 設定 API Key</button>'}
+        <button class="btn indigo w-full mt-2" onclick="G.modalQueue.push(openKana); closeModal()">🈁 先練五十音</button>
+        <button class="btn white w-full mt-2" onclick="closeModal()">開始經營</button></div>`, { sticky: true });
+}
+window.addEventListener('resize', () => { if (G.tour) showTourStep(); });
+
+// ============================================================
 // 開店引導、鍵盤、啟動
 // ============================================================
 function openWelcome() {
@@ -2643,14 +2725,13 @@ function finishWelcome() {
     S.level = $('w-level')?.value || 'N5';
     const shop = newShop('yatai', name.slice(0, 12));
     S.shops.push(shop); S.active = shop.id; S.lastCollect = Date.now();
-    save(); closeModal(); render(); burst();
+    save(); closeModal(); render(); burst(); startTour();
     if (S.migrated) { delete S.migrated; save(); toast('已把舊版 LinguaMax 的經驗值換成日圓，學過的單字不會重複出現。', 'gold', 5000); }
     checkLogin();
-    if (S.level === 'N5') toast('還不熟五十音的話，先到「五十音」道場練練 🈁', 'info', 5000);
 }
 
 document.addEventListener('keydown', e => {
-    const p = G.play; if (!p || p.loading || G.modalOpen) return;
+    const p = G.play; if (!p || p.loading || G.modalOpen || G.tour) return;
     const typing = e.target?.tagName === 'INPUT';
     if (e.key === 'Enter') {
         if ($('sheet').classList.contains('show')) { e.preventDefault(); nextChallenge(); }
