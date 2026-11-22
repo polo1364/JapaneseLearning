@@ -445,11 +445,27 @@ const styleOf = () => STYLES[S.style] || STYLES.general;
 // 羅馬拼音：預設只在初階（N5、N4）顯示，可以在設定改成一律顯示或不顯示
 const showRomaji = () => S.romaji === 'on' || (S.romaji !== 'off' && (S.level === 'N5' || S.level === 'N4'));
 const exRomajiHTML = w => (showRomaji() && w.exampleRomaji ? `<div class="text-xs" style="color:var(--muted)">${esc(w.exampleRomaji)}</div>` : '');
-function withRomaji(options, pool) {
+function withRomaji(options, pool, key = 'word') {
     if (!showRomaji()) return options;
-    options.forEach(o => { const x = pool.find(p => p.word === o.label); if (x && x.romaji) o.sub = x.romaji; });
+    options.forEach(o => { const x = pool.find(p => p[key] === o.label); if (x && x.romaji) o.sub = x.romaji; });
     return options;
 }
+// 單一假名的羅馬拼音對照（第一次用到時從五十音資料建立）
+let KANA_RM = null;
+function kanaRm(c) {
+    if (!KANA_RM) {
+        KANA_RM = { 'っ': '促音', 'ッ': '促音', 'ー': '長音' };
+        for (const sc of ['hiragana', 'katakana']) {
+            for (const k of [...KANA_DECKS[sc], ...KANA_EXTRA[sc].dakuten, ...KANA_EXTRA[sc].handaku]) if ([...k.word].length === 1) KANA_RM[k.word] = String(k.romaji).split('/')[0];
+        }
+        // 五十音資料裡促音的讀法是英文說明，這裡改回中文標示
+        Object.assign(KANA_RM, { 'っ': '促音', 'ッ': '促音', 'ー': '長音' });
+        // 拗音用的小字
+        [['ゃ', 'ya'], ['ゅ', 'yu'], ['ょ', 'yo'], ['ぁ', 'a'], ['ぃ', 'i'], ['ぅ', 'u'], ['ぇ', 'e'], ['ぉ', 'o'], ['ャ', 'ya'], ['ュ', 'yu'], ['ョ', 'yo'], ['ァ', 'a'], ['ィ', 'i'], ['ゥ', 'u'], ['ェ', 'e'], ['ォ', 'o']].forEach(([k, r]) => { KANA_RM[k] = '小 ' + r; });
+    }
+    return KANA_RM[c] || '';
+}
+const kanaTiles = tiles => ({ tiles, tileRm: showRomaji() ? tiles.map(kanaRm) : null });
 // 接在出題提示的程度說明後面；「一般」不加任何東西
 const styleLine = () => (styleOf().focus ? `\nStyle focus (${S.style}): ${styleOf().focus} Stay within the given topic and level; let this focus decide which items you choose and how the examples are phrased.` : '');
 
@@ -2004,7 +2020,7 @@ function selectStreet(i) {
 // ============================================================
 // 答題引擎
 // ============================================================
-function openPlay() { $('play').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+function openPlay() { backfillRomaji(); $('play').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
 function closePlay() {
     const p = G.play;
     if (p?.timer) clearInterval(p.timer);
@@ -2070,16 +2086,16 @@ function makeChallenge(w, type, pool) {
     switch (type) {
         case 'listen': return { ...base, kind: 'choice', title: '聽聽看，客人說的是什麼意思？', big: '🔊', audio: w.word, audioOnly: true, options: meanOpts() };
         case 'reverse': return { ...base, kind: 'choice', title: '客人要找的是哪一件商品？', big: w.mean, options: withRomaji(opts(w.word, othersOf(w, pool, 'word'), true), pool) };
-        case 'reading': return { ...base, kind: 'choice', title: '這個字怎麼唸？', big: w.word, bigJp: true, options: opts(w.kana, othersOf(w, pool, 'kana'), true) };
+        case 'reading': return { ...base, kind: 'choice', title: '這個字怎麼唸？', big: w.word, bigJp: true, options: withRomaji(opts(w.kana, othersOf(w, pool, 'kana'), true), pool, 'kana') };
         case 'exlisten': return { ...base, kind: 'choice', title: '聽例句，選出正確的意思', big: '🔊', audio: w.example, audioOnly: true, answerText: `${w.example}＝${w.trans}`, options: opts(w.trans, othersOf(w, pool, 'trans'), false) };
         case 'sentence': { const order = shuffle(w.chunks.map((_, i) => i)); const rm = showRomaji() && Array.isArray(w.chunkRomaji) && w.chunkRomaji.length === w.chunks.length;
-            return { ...base, kind: 'build', small: true, title: '把這句話排出來', big: w.trans, answerText: `${w.example}＝${w.trans}`, target: [...w.chunks], tiles: order.map(i => w.chunks[i]), tileRm: rm ? order.map(i => w.chunkRomaji[i]) : null, picked: [] }; }
+            return { ...base, kind: 'build', small: true, title: '把這句話排出來', big: w.trans, answerText: `${w.example}＝${w.trans}`, target: [...w.chunks], order, tiles: order.map(i => w.chunks[i]), tileRm: rm ? order.map(i => w.chunkRomaji[i]) : null, picked: [] }; }
         case 'build': {
             const target = Array.from(w.kana);
             const kata = /[ァ-ヺ]/.test(w.kana);
             const src = Array.from(kata ? 'アイウエオカキクケコサシスセソタチツテトナニヌネノマミムメモラリルレロン' : 'あいうえおかきくけこさしすせそたちつてとなにぬねのまみむめもらりるれろん');
             const decoys = shuffle(src.filter(c => !target.includes(c))).slice(0, target.length <= 3 ? 3 : 2);
-            return { ...base, kind: 'build', title: '把假名排成這件商品的讀音', big: w.mean, sub: w.word !== w.kana ? w.word : '', target, tiles: shuffle([...target, ...decoys]), picked: [] };
+            return { ...base, kind: 'build', title: '把假名排成這件商品的讀音', big: w.mean, sub: w.word !== w.kana ? w.word : '', target, ...kanaTiles(shuffle([...target, ...decoys])), picked: [] };
         }
         case 'type': return { ...base, kind: 'type', title: '用假名或羅馬字打出這件商品', big: w.mean, sub: w.word !== w.kana ? `提示：${w.word}` : '', accept: [w.word, w.kana], romaji: w.romaji };
         default: return { ...base, type: 'mean', kind: 'choice', title: '這件商品是什麼意思？', big: w.word, bigJp: true, sub: [w.word !== w.kana ? w.kana : '', showRomaji() ? w.romaji : ''].filter(Boolean).join('・'), audio: w.word, options: meanOpts() };
@@ -2116,6 +2132,8 @@ function renderChallenge() {
 function replayAudio(slow) { const ch = G.play?.queue[G.play.pos]; if (ch?.audio) speak(ch.audio, slow); }
 function renderBuild() {
     const ch = G.play.queue[G.play.pos];
+    // 句子方塊的拼音在顯示當下才取：背景補齊完成後，同一題重畫就會出現
+    if (ch.type === 'sentence' && ch.order) ch.tileRm = showRomaji() && Array.isArray(ch.w.chunkRomaji) && ch.w.chunkRomaji.length === ch.target.length ? ch.order.map(i => ch.w.chunkRomaji[i]) : null;
     $('slots').innerHTML = ch.target.map((_, i) => { const t = ch.picked[i]; return `<button class="slot ${t != null ? 'filled' : ''} bg-transparent border-0" style="${ch.small ? 'font-size:1.05rem;' : ''}${ch.tileRm ? 'height:auto;min-height:3.4rem;line-height:1.25;padding:.2rem .15rem;' : ''}border-bottom:4px solid ${t != null ? 'var(--blue)' : '#d9cbb6'}" onclick="unpickTile(${i})">${t != null ? `<span>${esc(ch.tiles[t])}${tileRmHTML(ch, t)}</span>` : ''}</button>`; }).join('');
     $('tiles').innerHTML = ch.tiles.map((c, i) => `<button class="tile ${ch.picked.includes(i) ? 'used' : ''}" style="${ch.small ? 'font-size:1.05rem;' : ''}${ch.tileRm ? 'height:auto;min-height:3.4rem;line-height:1.25;padding:.3rem .6rem' : ''}" onclick="pickTile(${i})"><span>${esc(c)}${tileRmHTML(ch, i)}</span></button>`).join('');
     const btn = $('confirm-btn'); if (btn) btn.disabled = ch.picked.length < ch.target.length;
@@ -2522,6 +2540,8 @@ JSON shape: {"items":[{"id":0,"romaji":["onamae wa","nan","desu ka."]}]}`);
             n++;
         }
         if (n) save();
+        const p = G.play, c = p && p.queue && p.queue[p.pos];
+        if (n && c && c.type === 'sentence' && !p.locked && $('slots')) renderBuild();
     } catch {}
     G.backfilling = false;
 }
@@ -2868,8 +2888,8 @@ function renderMe() {
             <select class="field mt-1" onchange="S.style=this.value; G.prefetch={}; save(); renderMe()">${Object.entries(STYLES).map(([k, v]) => `<option value="${k}" ${S.style === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select>
             <span class="block text-xs mt-1" style="color:var(--muted)">${styleOf().hint}。改了之後，下一關進貨、下一份文法講義和下一段會話開始生效；已經學過的單字不會變。</span></label>
         <label class="block"><span class="text-sm">羅馬拼音</span>
-            <select class="field mt-1" onchange="S.romaji=this.value; G.prefetch={}; save(); renderMe(); backfillRomaji()">${[['auto', '初階自動顯示（N5、N4）'], ['on', '一律顯示'], ['off', '不顯示']].map(([k, l]) => `<option value="${k}" ${(S.romaji || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-            <span class="block text-xs mt-1" style="color:var(--muted)">目前${showRomaji() ? '會' : '不會'}顯示。考讀音的題目（選讀音、排假名、打字）不會顯示，以免直接看到答案。</span></label>
+            <select class="field mt-1" onchange="S.romaji=this.value; G.prefetch={}; save(); renderMe(); backfillRomaji()">${[['auto', '難度是 N5、N4 時顯示'], ['on', '一律顯示'], ['off', '不顯示']].map(([k, l]) => `<option value="${k}" ${(S.romaji || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+            <span class="block text-xs mt-1" style="color:var(--muted)">${S.romaji === 'on' ? '目前一律顯示。' : S.romaji === 'off' ? '目前不顯示。' : `你現在的難度是「${LEVELS[S.level].label}」，所以目前${showRomaji() ? '會' : '不會'}顯示。`}只有打字題不顯示，因為羅馬拼音就是答案。</span></label>
         <label class="block"><span class="text-sm">發音語速</span>
             <select class="field mt-1" onchange="S.rate=Number(this.value); save(); speak('こんにちは')">${[[.7, '慢'], [.85, '稍慢'], [1, '正常'], [1.15, '稍快']].map(([v, l]) => `<option value="${v}" ${S.rate === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <div class="grid grid-cols-2 gap-2">
@@ -3121,7 +3141,7 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 // 開啟幾秒後，在背景補齊已學單字缺少的句子拼音
-setTimeout(backfillRomaji, 4000);
+setTimeout(backfillRomaji, 1500);
 // 請瀏覽器不要自動清掉存檔
 if (S.shops.length) navigator.storage?.persist?.().catch(() => {});
 // App 圖示長按的捷徑：./?go=review、order、kana
