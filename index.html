@@ -442,6 +442,14 @@ const STYLES = {
     convo: { label: '會話優先', hint: '可以直接複誦的短句、附和與固定說法', focus: 'Prioritise short, repeatable conversational chunks and natural responses (aizuchi, set phrases) over isolated nouns.' }
 };
 const styleOf = () => STYLES[S.style] || STYLES.general;
+// 羅馬拼音：預設只在初階（N5、N4）顯示，可以在設定改成一律顯示或不顯示
+const showRomaji = () => S.romaji === 'on' || (S.romaji !== 'off' && (S.level === 'N5' || S.level === 'N4'));
+const exRomajiHTML = w => (showRomaji() && w.exampleRomaji ? `<div class="text-xs" style="color:var(--muted)">${esc(w.exampleRomaji)}</div>` : '');
+function withRomaji(options, pool) {
+    if (!showRomaji()) return options;
+    options.forEach(o => { const x = pool.find(p => p.word === o.label); if (x && x.romaji) o.sub = x.romaji; });
+    return options;
+}
 // 接在出題提示的程度說明後面；「一般」不加任何東西
 const styleLine = () => (styleOf().focus ? `\nStyle focus (${S.style}): ${styleOf().focus} Stay within the given topic and level; let this focus decide which items you choose and how the examples are phrased.` : '');
 
@@ -976,7 +984,7 @@ function burst() { try { window.confetti?.({ particleCount: 70, spread: 70, orig
 // ============================================================
 function defaultState() {
     return {
-        v: 1, level: 'N5', style: 'general', coins: 300, streak: 0, lastActive: '', sound: true, rate: 1, fluent: true,
+        v: 1, level: 'N5', style: 'general', romaji: 'auto', coins: 300, streak: 0, lastActive: '', sound: true, rate: 1, fluent: true,
         shops: [], active: null, lots: [], supplies: { rice: 3 }, bg: 'sunny', bgs: ['sunny'], lastClean: 0,
         progress: {}, dex: {}, legacy: [], grammarSeen: [],
         daily: { date: '', new: 0, correct: 0, chat: 0, claimed: [] },
@@ -1399,7 +1407,7 @@ function openGoodsPicker(sid) {
         <p class="text-sm mt-1 mb-2" style="color:var(--muted)">每件商品依熟練度加營業額（每顆 ★ +4%）。到期沒盤點的商品會過期，不計加成。店鋪改裝後貨架會變大。</p>
         ${list.length ? list.map((d, i) => { const on = mine.includes(d.word), ok = goodFresh(d);
             return `<button class="card p-2 w-full flex items-center gap-2 text-left mt-1.5" style="${on ? 'border-color:var(--green);background:var(--green-t)' : ''}" onclick="toggleGood('${sid}', ${i})">
-                <div class="flex-1 min-w-0"><div class="jp font-black truncate">${esc(d.word)} <span class="text-xs" style="color:var(--muted)">${esc(d.mean)}</span></div>
+                <div class="flex-1 min-w-0"><div class="jp font-black truncate">${esc(d.word)} <span class="text-xs" style="color:var(--muted)">${showRomaji() && d.romaji ? esc(d.romaji) + '・' : ''}${esc(d.mean)}</span></div>
                 <div class="text-xs" style="color:${ok ? 'var(--muted)' : 'var(--red-d)'}">${'★'.repeat(d.box || 0) || '☆'}${ok ? '' : '・過期，先去盤點'}${where[d.word] ? '・已在 ' + esc(where[d.word]) : ''}</div></div>
                 <span class="text-sm font-black" style="color:${on ? 'var(--green-d)' : 'var(--muted)'}">${on ? '已上架 ✓' : '上架'}</span></button>`; }).join('')
             : '<div class="text-center py-6" style="color:var(--muted)"><div class="text-5xl mb-2">📦</div>商品帳還是空的，先去進貨吧。</div>'}
@@ -1626,7 +1634,7 @@ Rules:
 - "distractors": 3 plausible but WRONG Traditional Chinese meanings, all different from "mean".
 - "rarity": 1 (common), 2 (useful), or 3 (advanced for this level).
 - "notes": optional short Traditional Chinese tip about politeness, nuance or pronunciation.
-- "chunks": the "example" sentence split into 3-6 natural chunks in order (a word with its particle stays together). Joined together they must equal "example" exactly, including the final punctuation.
+- "chunks": the "example" sentence split into 3-6 natural chunks in order (a word with its particle stays together). Joined together they must equal "example" exactly, including the final punctuation.${showRomaji() ? '\n- "exampleRomaji": Hepburn romaji of the whole "example" sentence, with spaces between words.' : ''}
 
 JSON shape:
 {"words":[{"word":"領収書","kana":"りょうしゅうしょ","romaji":"ryoushuusho","pos":"名詞","mean":"收據","example":"領収書をお願いします。","trans":"請給我收據。","distractors":["發票號碼","零錢","購物袋"],"rarity":2,"notes":"比レシート正式，報帳時用。","chunks":["領収書を","お願い","します。"]}]}`;
@@ -1652,7 +1660,7 @@ function chatSystem(sc, opening) {
     return `You are a friendly Japanese conversation partner for a Traditional Chinese (Taiwan) speaker.
 Role-play scenario: "${sc.value}" (${sc.label}). Stay in character as the other person (staff, friend, colleague…).
 You have already opened the conversation with: 「${opening}」
-Learner level: JLPT ${S.level} — ${lv().desc}. Keep replies to 1-2 short sentences at this level.${styleLine()}
+Learner level: JLPT ${S.level} — ${lv().desc}. Keep replies to 1-2 short sentences at this level.${styleLine()}${showRomaji() ? '\nIn every JSON reply also include "romaji": Hepburn romaji of "reply", with spaces between words.' : ''}
 All Chinese must be natural Traditional Chinese (繁體中文, Taiwan).
 
 User turns are labelled [JAPANESE] or [CHINESE].
@@ -2059,7 +2067,7 @@ function makeChallenge(w, type, pool) {
     const base = { w, type, answerText: `${w.word}${w.word !== w.kana ? `（${w.kana}）` : ''}＝${w.mean}` };
     switch (type) {
         case 'listen': return { ...base, kind: 'choice', title: '聽聽看，客人說的是什麼意思？', big: '🔊', audio: w.word, audioOnly: true, options: meanOpts() };
-        case 'reverse': return { ...base, kind: 'choice', title: '客人要找的是哪一件商品？', big: w.mean, options: opts(w.word, othersOf(w, pool, 'word'), true) };
+        case 'reverse': return { ...base, kind: 'choice', title: '客人要找的是哪一件商品？', big: w.mean, options: withRomaji(opts(w.word, othersOf(w, pool, 'word'), true), pool) };
         case 'reading': return { ...base, kind: 'choice', title: '這個字怎麼唸？', big: w.word, bigJp: true, options: opts(w.kana, othersOf(w, pool, 'kana'), true) };
         case 'exlisten': return { ...base, kind: 'choice', title: '聽例句，選出正確的意思', big: '🔊', audio: w.example, audioOnly: true, answerText: `${w.example}＝${w.trans}`, options: opts(w.trans, othersOf(w, pool, 'trans'), false) };
         case 'sentence': return { ...base, kind: 'build', small: true, title: '把這句話排出來', big: w.trans, answerText: `${w.example}＝${w.trans}`, target: [...w.chunks], tiles: shuffle([...w.chunks]), picked: [] };
@@ -2071,7 +2079,7 @@ function makeChallenge(w, type, pool) {
             return { ...base, kind: 'build', title: '把假名排成這件商品的讀音', big: w.mean, sub: w.word !== w.kana ? w.word : '', target, tiles: shuffle([...target, ...decoys]), picked: [] };
         }
         case 'type': return { ...base, kind: 'type', title: '用假名或羅馬字打出這件商品', big: w.mean, sub: w.word !== w.kana ? `提示：${w.word}` : '', accept: [w.word, w.kana], romaji: w.romaji };
-        default: return { ...base, type: 'mean', kind: 'choice', title: '這件商品是什麼意思？', big: w.word, bigJp: true, sub: w.word !== w.kana ? w.kana : '', audio: w.word, options: meanOpts() };
+        default: return { ...base, type: 'mean', kind: 'choice', title: '這件商品是什麼意思？', big: w.word, bigJp: true, sub: [w.word !== w.kana ? w.kana : '', showRomaji() ? w.romaji : ''].filter(Boolean).join('・'), audio: w.word, options: meanOpts() };
     }
 }
 function rebuild(ch) { return ch.w && !ch.fixed ? { ...makeChallenge(ch.w, ch.type, G.play.pool || wordPool([])), say: ch.say, retry: true } : { ...ch, options: ch.options ? shuffle(ch.options) : ch.options, retry: true }; }
@@ -2085,7 +2093,7 @@ function renderChallenge() {
         : `<div class="${ch.bigJp ? 'jp text-4xl' : 'text-3xl'} font-black" style="word-break:break-word">${esc(ch.big)}</div>${ch.sub ? `<div class="jp mt-1" style="color:var(--muted)">${esc(ch.sub)}</div>` : ''}${ch.zh ? `<div class="text-sm mt-1" style="color:var(--muted)">${esc(ch.zh)}</div>` : ''}${ch.audio ? `<button class="btn white sm mt-3" onclick="replayAudio()">🔊 聽發音</button>` : ''}`;
     let inner = '';
     if (ch.kind === 'choice' || ch.kind === 'grammar') {
-        inner = `<div class="space-y-2.5">${ch.options.map((o, i) => `<button class="opt ${o.jp ? 'jp' : ''}" data-i="${i}" ${o.cut ? 'disabled style="opacity:.35"' : ''} onclick="answerOption(${i})"><span class="k">${i + 1}</span><span>${esc(o.label)}</span></button>`).join('')}</div>`;
+        inner = `<div class="space-y-2.5">${ch.options.map((o, i) => `<button class="opt ${o.jp ? 'jp' : ''}" data-i="${i}" ${o.cut ? 'disabled style="opacity:.35"' : ''} onclick="answerOption(${i})"><span class="k">${i + 1}</span><span>${esc(o.label)}${o.sub ? `<small class="block text-xs" style="color:var(--muted);font-weight:700">${esc(o.sub)}</small>` : ''}</span></button>`).join('')}</div>`;
     } else if (ch.kind === 'build') {
         inner = `<div id="slots" class="flex flex-wrap justify-center mb-6 jp" style="min-height:3.4rem"></div><div id="tiles" class="flex flex-wrap justify-center gap-2 jp"></div>`;
     } else if (ch.kind === 'type') {
@@ -2171,7 +2179,8 @@ function showSheet(ok, ch) {
             <div class="flex-1 min-w-0">
                 <div class="font-black text-lg" style="color:${ok ? 'var(--green-d)' : 'var(--red-d)'}">${ok ? pick(['答對了！', 'お見事！', '好眼力！', 'すごい！']) : '正確答案'}</div>
                 <div class="jp font-black mt-0.5" style="word-break:break-word">${esc(ch.answerText || '')}</div>
-                ${isWord && w.example ? `<div class="jp text-sm mt-1.5">${esc(w.example)}</div><div class="text-xs" style="color:var(--muted)">${esc(w.trans || '')}</div>` : ''}
+                ${isWord && showRomaji() && w.romaji ? `<div class="text-xs" style="color:var(--muted)">${esc(w.romaji)}</div>` : ''}
+                ${isWord && w.example ? `<div class="jp text-sm mt-1.5">${esc(w.example)}</div>${exRomajiHTML(w)}<div class="text-xs" style="color:var(--muted)">${esc(w.trans || '')}</div>` : ''}
                 ${ch.reason ? `<div class="text-sm mt-1.5">${esc(ch.reason)}</div>` : ''}
             </div>
             ${ch.say ? `<button class="btn white sm" onclick="speak(G.play.queue[G.play.pos].say)" aria-label="聽發音">🔊</button>` : ''}
@@ -2220,7 +2229,7 @@ function renderIntro() {
         </div>
         ${w.example ? `<button class="card p-4 mt-3 w-full text-left" onclick="speak(G.play.words[G.play.intro].example)">
             <div class="text-xs font-black mb-1" style="color:var(--muted)">💬 例句（點一下聽）</div>
-            <div class="jp font-black">${esc(w.example)}</div><div class="text-sm mt-1" style="color:var(--muted)">${esc(w.trans || '')}</div></button>` : ''}
+            <div class="jp font-black">${esc(w.example)}</div>${exRomajiHTML(w)}<div class="text-sm mt-1" style="color:var(--muted)">${esc(w.trans || '')}</div></button>` : ''}
         ${w.notes ? `<div class="card p-3 mt-3 text-sm" style="background:#fffbea;border-color:#f3d77b">💡 ${esc(w.notes)}</div>` : ''}
     </div>`;
     $('play-foot').innerHTML = `<div class="flex gap-2">${p.intro ? `<button class="btn white" onclick="G.play.intro--; renderIntro()">←</button>` : ''}<button class="btn flex-1 text-lg" onclick="nextIntro()">${last ? '開始上架測驗 →' : '下一件 →'}</button></div>`;
@@ -2404,7 +2413,7 @@ function renderOrder() {
         <div class="text-sm font-black mb-2" style="color:var(--muted)">第 ${p.round} 位客人・把客人要的 ${c.want.length} 件商品從貨架上挑出來</div>
         <div class="flex items-end gap-2 mb-4">
             <div>${artHTML('critic_' + c.guest.id, c.guest.critic, 84)}</div>
-            <button class="card p-3 flex-1 text-left" onclick="speak(G.play.cur.line)"><div class="jp font-black text-lg" style="word-break:break-word">🔊 ${esc(c.line)}</div><div class="text-xs mt-1" style="color:var(--muted)">點一下再聽一次</div></button>
+            <button class="card p-3 flex-1 text-left" onclick="speak(G.play.cur.line)"><div class="jp font-black text-lg" style="word-break:break-word">🔊 ${esc(c.line)}</div>${showRomaji() ? `<div class="text-xs mt-1" style="color:var(--muted)">${esc(c.want.map(w => w.romaji).filter(Boolean).join('、'))}</div>` : ''}<div class="text-xs mt-1" style="color:var(--muted)">點一下再聽一次</div></button>
         </div>
         <div class="grid grid-cols-2 gap-2">${c.shelf.map((w, i) => { const got = c.got.includes(i), bad = c.bad.includes(i); return `<button class="opt center ${got ? 'ok' : ''} ${bad ? 'bad' : ''}" ${got || bad ? 'disabled' : ''} onclick="pickOrder(${i})"><span>${esc(w.mean)}</span></button>`; }).join('')}</div></div>`;
     $('play-foot').innerHTML = '';
@@ -2442,14 +2451,14 @@ function startMatch() {
     const ws = [], seen = new Set();
     for (const w of shuffle(Object.values(S.dex))) { if (seen.has(w.mean) || seen.has(w.word)) continue; seen.add(w.mean); seen.add(w.word); ws.push(w); if (ws.length >= 6) break; }
     let pairs;
-    if (ws.length >= 6) pairs = ws.map(w => [w.word, w.mean, w.word]);
+    if (ws.length >= 6) pairs = ws.map(w => [w.word, w.mean, w.word, w.romaji]);
     else { const ks = [], sr = new Set(); for (const k of shuffle(kanaPool('hiragana'))) { if (sr.has(k.romaji)) continue; sr.add(k.romaji); ks.push(k); if (ks.length >= 6) break; } pairs = ks.map(k => [k.kana, k.romaji, k.kana]); }
-    const cards = shuffle(pairs.flatMap(([a, b, say], id) => [{ id, text: a, jp: true, say }, { id, text: b, jp: false }]));
+    const cards = shuffle(pairs.flatMap(([a, b, say, rm], id) => [{ id, text: a, jp: true, say, sub: rm }, { id, text: b, jp: false }]));
     G.play = makeRun('match', { cards, open: [], doneIdx: [], moves: 0, kanaOnly: ws.length < 6 });
     openPlay();
     $('play-foot').innerHTML = '';
     $('play-body').innerHTML = `<div class="anim-in pt-2"><div class="text-sm font-black mb-3" style="color:var(--muted)">把${G.play.kanaOnly ? '假名和讀音' : '商品和它的意思'}配成一對（商品帳滿 6 個單字後會改用你的單字）</div>
-        <div class="grid gap-2" style="grid-template-columns:repeat(3, minmax(0, 1fr))">${cards.map((c, i) => `<button class="mcard" data-i="${i}" onclick="flipMatch(${i})"><div class="mcard-in"><div class="mface mback" style="background:var(--pri);box-shadow:0 4px 0 var(--pri-d)">🏮</div><div class="mface mfront ${c.jp ? 'jp' : ''}" style="${c.jp ? 'font-size:1.15rem' : ''}">${esc(c.text)}</div></div></button>`).join('')}</div></div>`;
+        <div class="grid gap-2" style="grid-template-columns:repeat(3, minmax(0, 1fr))">${cards.map((c, i) => `<button class="mcard" data-i="${i}" onclick="flipMatch(${i})"><div class="mcard-in"><div class="mface mback" style="background:var(--pri);box-shadow:0 4px 0 var(--pri-d)">🏮</div><div class="mface mfront ${c.jp ? 'jp' : ''}" style="${c.jp ? 'font-size:1.15rem' : ''}"><span>${esc(c.text)}${c.sub && showRomaji() ? `<small class="block" style="font-size:.7rem;color:var(--muted);font-weight:700">${esc(c.sub)}</small>` : ''}</span></div></div></button>`).join('')}</div></div>`;
     syncMatch();
 }
 function syncMatch() {
@@ -2685,7 +2694,7 @@ function renderDexList() {
         const st = STREETS.find(s => s.id === d.street);
         return `<button class="card p-3 text-left" onclick="openWord(${i})">
             <div class="flex items-start justify-between gap-1"><div class="jp font-black text-lg leading-tight" style="word-break:break-word">${esc(d.word)}</div><span class="text-xs">${st ? st.emoji : ''}</span></div>
-            <div class="jp text-xs" style="color:var(--muted)">${d.word !== d.kana ? esc(d.kana) : esc(d.romaji)}</div>
+            <div class="jp text-xs" style="color:var(--muted)">${esc([d.word !== d.kana ? d.kana : '', (showRomaji() || d.word === d.kana) ? d.romaji : ''].filter(Boolean).join('・'))}</div>
             <div class="text-sm mt-1 line-2">${esc(d.mean)}</div>
             <div class="flex gap-1 mt-2">${[1, 3, 5].map(b => `<i class="flex-1 rounded-full" style="height:5px;background:${d.box >= b ? 'var(--green)' : '#eadfce'}"></i>`).join('')}</div>
         </button>`; }).join('') : `<div class="col-span-2 text-center py-10" style="color:var(--muted)"><div class="text-5xl mb-2">📦</div>${dexCount() ? '沒有符合的商品' : '商品帳還是空的，到「商店街」進貨吧'}</div>`;
@@ -2699,7 +2708,7 @@ function openWord(i) {
         <div class="text-sm" style="color:var(--muted)">${esc(d.romaji)}${d.pos ? ` ・ ${esc(d.pos)}` : ''}</div>
         <div class="text-xl font-black mt-2">${esc(d.mean)}</div>
         <div class="flex justify-center gap-2 mt-3"><button class="btn blue sm" onclick="speak(G.wordView.word)">🔊 發音</button><button class="btn white sm" onclick="speak(G.wordView.word, true)">🐢 慢速</button></div></div>
-        ${d.example ? `<button class="card p-3 mt-3 w-full text-left" onclick="speak(G.wordView.example)"><div class="jp font-black">🔊 ${esc(d.example)}</div><div class="text-sm mt-1" style="color:var(--muted)">${esc(d.trans || '')}</div></button>` : ''}
+        ${d.example ? `<button class="card p-3 mt-3 w-full text-left" onclick="speak(G.wordView.example)"><div class="jp font-black">🔊 ${esc(d.example)}</div>${exRomajiHTML(d)}<div class="text-sm mt-1" style="color:var(--muted)">${esc(d.trans || '')}</div></button>` : ''}
         ${d.notes ? `<div class="card p-3 mt-2 text-sm" style="background:#fffbea;border-color:#f3d77b">💡 ${esc(d.notes)}</div>` : ''}
         <div class="text-xs mt-3 text-center" style="color:var(--muted)">答對 ${d.correct || 0}・答錯 ${d.wrong || 0}・熟練度 ${d.box || 0}/5・下次盤點 ${esc(d.due || '—')}</div>
         <button class="btn white w-full mt-3" onclick="closeModal()">關閉</button>`);
@@ -2756,7 +2765,7 @@ function chatMsgHTML(m, i) {
             ${(t.expressions || []).map((e, j) => `<button class="block w-full text-left bg-transparent border-0 p-0 mt-1.5" onclick="speak(G.chat.msgs[${i}].teaching.expressions[${j}].japanese)"><span class="jp font-black">🔊 ${esc(e.japanese)}</span><span class="block text-xs" style="color:var(--muted)">${esc(e.kana || '')} ${esc(e.romaji || '')}${e.note ? `・${esc(e.note)}` : ''}</span></button>`).join('')}
             ${t.tip ? `<div class="text-xs mt-1.5">💡 ${esc(t.tip)}</div>` : ''}</div>` : ''}
         <button class="block w-full text-left bg-transparent border-0 p-0" onclick="speak(G.chat.msgs[${i}].text)"><span class="jp font-black">🔊 ${esc(m.text)}</span></button>
-        ${m.kana ? `<div class="jp text-xs mt-0.5" style="color:var(--muted)">${esc(m.kana)}</div>` : ''}
+        ${m.kana ? `<div class="jp text-xs mt-0.5" style="color:var(--muted)">${esc(m.kana)}</div>` : ''}${showRomaji() && m.romaji ? `<div class="text-xs" style="color:var(--muted)">${esc(m.romaji)}</div>` : ''}
         <div class="text-sm mt-1" style="color:var(--muted)">${esc(m.chinese || '')}</div></div>`;
 }
 function startChat(i) {
@@ -2795,7 +2804,7 @@ async function sendChat() {
             addBond(s, 2); gainXp(s, 3); setPop(s, popularity(s) + 3);
             playSound(me.score >= 60 ? 'coin' : 'tap');
         }
-        c.msgs.push({ role: 'ai', text: String(d.reply || ''), kana: d.kana || '', chinese: d.chinese || '', teaching: d.teaching && Array.isArray(d.teaching.expressions) ? d.teaching : null });
+        c.msgs.push({ role: 'ai', text: String(d.reply || ''), kana: d.kana || '', romaji: d.romaji || '', chinese: d.chinese || '', teaching: d.teaching && Array.isArray(d.teaching.expressions) ? d.teaching : null });
         c.busy = false; save(); renderChat(); speak(d.reply);
     } catch (e) {
         if (G.chat !== c) return;
@@ -2830,6 +2839,9 @@ function renderMe() {
         <label class="block"><span class="text-sm">風格（同樣的難度下，偏向哪一種用語）</span>
             <select class="field mt-1" onchange="S.style=this.value; G.prefetch={}; save(); renderMe()">${Object.entries(STYLES).map(([k, v]) => `<option value="${k}" ${S.style === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select>
             <span class="block text-xs mt-1" style="color:var(--muted)">${styleOf().hint}。改了之後，下一關進貨、下一份文法講義和下一段會話開始生效；已經學過的單字不會變。</span></label>
+        <label class="block"><span class="text-sm">羅馬拼音</span>
+            <select class="field mt-1" onchange="S.romaji=this.value; G.prefetch={}; save(); renderMe()">${[['auto', '初階自動顯示（N5、N4）'], ['on', '一律顯示'], ['off', '不顯示']].map(([k, l]) => `<option value="${k}" ${(S.romaji || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+            <span class="block text-xs mt-1" style="color:var(--muted)">目前${showRomaji() ? '會' : '不會'}顯示。考讀音的題目（選讀音、排假名、打字）不會顯示，以免直接看到答案。</span></label>
         <label class="block"><span class="text-sm">發音語速</span>
             <select class="field mt-1" onchange="S.rate=Number(this.value); save(); speak('こんにちは')">${[[.7, '慢'], [.85, '稍慢'], [1, '正常'], [1.15, '稍快']].map(([v, l]) => `<option value="${v}" ${S.rate === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <div class="grid grid-cols-2 gap-2">
@@ -2925,7 +2937,7 @@ function confirmReset(kind) {
 function doReset(kind) {
     try {
         if (kind === 'shop') {
-            const keep = { level: S.level, style: S.style, sound: S.sound, rate: S.rate, fluent: S.fluent, dex: S.dex, legacy: S.legacy, grammarSeen: S.grammarSeen, installHide: S.installHide, tutorial: S.tutorial };
+            const keep = { level: S.level, style: S.style, romaji: S.romaji, sound: S.sound, rate: S.rate, fluent: S.fluent, dex: S.dex, legacy: S.legacy, grammarSeen: S.grammarSeen, installHide: S.installHide, tutorial: S.tutorial };
             localStorage.setItem(STORE_KEY, JSON.stringify({ ...defaultState(), ...keep }));
         } else localStorage.removeItem(STORE_KEY);
     } catch {}
