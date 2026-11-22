@@ -506,6 +506,9 @@ const ACHIEVEMENTS = [
     { id: 't3', icon: '🏯', name: '名店誕生', desc: '有一間店改裝到最終階段', v: () => S.shops.some(s => tierIndex(s) >= 2) ? 1 : 0, goal: 1, coins: 1500 },
     { id: 'ch20', icon: '💬', name: '能說會道', desc: '會話中用日文回 20 句', v: () => S.totals.chats, goal: 20, coins: 500 },
     { id: 'g10', icon: '📐', name: '文法修行', desc: '完成 10 次文法道場', v: () => S.totals.grammar, goal: 10, coins: 600 },
+    { id: 'up9', icon: '🔧', name: '設備齊全', desc: '一間店的三項設備全部升滿', v: () => S.shops.some(s => UPGRADES.every(u => upLv(s, u.id) >= 3)) ? 1 : 0, goal: 1, coins: 1500 },
+    { id: 'stf4', icon: '🙇', name: '人手充足', desc: '同時派出 4 位店員', v: () => Object.keys(S.staff || {}).length, goal: 4, coins: 800 },
+    { id: 'gd6', icon: '🧺', name: '滿架好貨', desc: '一間店上架 6 件沒過期的商品', v: () => Math.max(0, ...S.shops.map(s => shopGoods(s).filter(k => goodFresh(S.dex[k])).length)), goal: 6, coins: 1000 },
     { id: 'st3', icon: '🌟', name: '星級商店街', desc: '3 條街拿到星級評鑑', v: () => S.totals.stars || 0, goal: 3, coins: 2000 },
     { id: 'rk3', icon: '🏅', name: '觀光名所', desc: '商店街升到「觀光名所」', v: () => townRank(), goal: 3, coins: 1500 },
     { id: 'o20', icon: '🛎️', name: '待客之道', desc: '接單接待 20 位客人', v: () => S.totals.orders || 0, goal: 20, coins: 500 },
@@ -861,7 +864,7 @@ Object.assign(FLUENT, {
     "🧮": "Abacus|abacus", "🧳": "Luggage|luggage", "👔": "Necktie|necktie", "🥼": "Lab coat|lab_coat", "☂️": "Umbrella|umbrella", "🍁": "Maple leaf|maple_leaf",
     "🍂": "Fallen leaf|fallen_leaf", "🌰": "Chestnut|chestnut", "🍡": "Dango|dango", "🎆": "Fireworks|fireworks", "🎐": "Wind chime|wind_chime", "🍧": "Shaved ice|shaved_ice",
     "🚲": "Bicycle|bicycle", "🏬": "Department store|department_store", "🗼": "Tokyo tower|tokyo_tower", "🌟": "Glowing star|glowing_star", "💯": "Hundred points|hundred_points",
-    "🏘️": "Houses|houses", "📐": "Triangular ruler|triangular_ruler", "🏚️": "Derelict house|derelict_house", "🪧": "Placard|placard", "📝": "Memo|memo", "🈁": "Japanese here button|japanese_here_button", "🛎️": "Bellhop bell|bellhop_bell"
+    "🏘️": "Houses|houses", "📐": "Triangular ruler|triangular_ruler", "🏚️": "Derelict house|derelict_house", "🪧": "Placard|placard", "📝": "Memo|memo", "🈁": "Japanese here button|japanese_here_button", "🛎️": "Bellhop bell|bellhop_bell", "🧊": "Ice|ice", "🪑": "Chair|chair", "👤": "Bust in silhouette|bust_in_silhouette", "🙇": "!Person bowing|person_bowing"
 });
 const FLUENT_CDN = 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/';
 function fluentUrl(e) {
@@ -956,7 +959,7 @@ function defaultState() {
         progress: {}, dex: {}, legacy: [], grammarSeen: [],
         daily: { date: '', new: 0, correct: 0, chat: 0, claimed: [] },
         totals: { correct: 0, answered: 0, stages: 0, chats: 0, critics: 0, grammar: 0, perfect: 0, kana: 0, orders: 0, matches: 0, stars: 0 },
-        ach: [], best: { rush: 0 }
+        ach: [], best: { rush: 0 }, staff: {}
     };
 }
 function loadState() {
@@ -973,6 +976,7 @@ function loadState() {
         if (!s.progress || typeof s.progress !== 'object') s.progress = {};
         if (!LEVELS[s.level]) s.level = 'N5';
         if (!s.lastCollect) s.lastCollect = Date.now();
+        if (!s.staff || typeof s.staff !== 'object' || Array.isArray(s.staff)) s.staff = {};
         return s;
     }
     // 第一次開啟：把舊版 LinguaMax 的進度帶過來（舊資料保留不刪）
@@ -1039,14 +1043,126 @@ function tierIndex(s) { const lv = levelInfo(s).lv; return lv >= TIER_LV[2] ? 2 
 function tierName(s) { return typeOf(s).tiers[tierIndex(s)]; }
 function nextTierLv(s) { const t = tierIndex(s); return t < 2 ? TIER_LV[t + 1] : null; }
 // 新鮮度每小時 -2、人氣每小時 -3
-function freshness(s) { return Math.round(clamp(s.fresh - (Date.now() - s.freshAt) / 3.6e6 * (hasPerk('drug') ? 1 : 2))); }
-function popularity(s) { return Math.round(clamp(s.pop - (Date.now() - s.popAt) / 3.6e6 * (hasPerk('cafe') ? 1.5 : 3))); }
+function freshness(s) { return Math.round(clamp(s.fresh - (Date.now() - s.freshAt) / 3.6e6 * freshRate(s))); }
+function popularity(s) { return Math.round(clamp(s.pop - (Date.now() - s.popAt) / 3.6e6 * popRate(s))); }
 function setFresh(s, v) { s.fresh = clamp(v); s.freshAt = Date.now(); }
 function setPop(s, v) { s.pop = clamp(v); s.popAt = Date.now(); }
 function hearts(s) { return Math.min(5, Math.floor(s.bond / 20)); }
 function xpMultiplier(s) { if (freshness(s) < 20) return .5; return popularity(s) >= 70 ? 1.2 : 1; }
 function shopArt(s, px) { return artHTML(`shop_${s.type}_${tierIndex(s) + 1}`, typeOf(s).e, px); }
 function shopHTML(s, px) { return `<div class="shop-wrap" id="shop-wrap" onclick="pokeShop()"><span class="shop">${shopArt(s, px)}</span></div><div class="shadow"></div>`; }
+
+// ---------- 養成進階：設備、店員、上架商品 ----------
+// 設備：每間店各自升級，第 n 級需要店鋪到第 n 階段
+const UPGRADES = [
+    { id: 'fridge', e: '🧊', name: '冷藏庫', desc: '新鮮度下降 −15%／級' },
+    { id: 'sign', e: '🪧', name: '招牌', desc: '人氣下降 −15%／級' },
+    { id: 'seat', e: '🪑', name: '座位', desc: '營業額 +20%／級' }
+];
+const UP_COST = [400, 1000, 2500];
+const upLv = (s, id) => (s.up && s.up[id]) || 0;
+// 店員：通過評鑑的評論家會成為常客，可以請來當店員，一間店一位
+const SKILLS = {
+    income: { name: '精打細算', desc: '這間店的營業額 +15%' },
+    xp: { name: '待客高手', desc: '這間店獲得的評價 +10%' },
+    fresh: { name: '品管專家', desc: '這間店新鮮度下降 −30%' },
+    pop: { name: '人氣招牌', desc: '這間店人氣下降 −30%' }
+};
+const STAFF_TYPE = { kazu: 'income', konbini: 'income', kaimono: 'income', bijinesu: 'income', aisatsu: 'xp', gurume: 'xp', kurashi: 'xp', asobi: 'xp',
+    kusuri: 'fresh', kisetsu: 'fresh', yado: 'fresh', kinkyuu: 'fresh', eki: 'pop', tomodachi: 'pop', izakaya: 'pop', kuukou: 'pop' };
+function staffOf(s) { const id = Object.keys(S.staff || {}).find(k => S.staff[k] === s.id); return id ? STREETS.find(x => x.id === id) || null : null; }
+function staffSkill(s) { const st = staffOf(s); return st ? STAFF_TYPE[st.id] : null; }
+function freshRate(s) { return (hasPerk('drug') ? 1 : 2) * (1 - .15 * upLv(s, 'fridge')) * (staffSkill(s) === 'fresh' ? .7 : 1); }
+function popRate(s) { return (hasPerk('cafe') ? 1.5 : 3) * (1 - .15 * upLv(s, 'sign')) * (staffSkill(s) === 'pop' ? .7 : 1); }
+// 改變下降速度前先把目前數值定下來，避免數值突然跳動
+function snapshotShop(s) { setFresh(s, freshness(s)); setPop(s, popularity(s)); }
+// 上架商品：把學過的單字擺上貨架，越熟練營業額越高；到期沒盤點的商品算過期，不計加成
+function goodsSlots(s) { return 2 + tierIndex(s) * 2; }
+function shopGoods(s) { return (s.goods || []).filter(k => S.dex[k]).slice(0, goodsSlots(s)); }
+function goodFresh(d) { return !d.due || d.due >= dateStr(); }
+function goodsBonus(s) { return shopGoods(s).reduce((a, k) => { const d = S.dex[k]; return a + (goodFresh(d) ? (d.box || 0) * .04 : 0); }, 0); }
+function shopIncome(s) {
+    return [20, 45, 90][tierIndex(s)] * (.5 + freshness(s) / 200 + popularity(s) / 200) * (1 + .2 * upLv(s, 'seat')) * (staffSkill(s) === 'income' ? 1.15 : 1) * (1 + goodsBonus(s));
+}
+function shopManageHTML(s) {
+    const st = staffOf(s), slots = goodsSlots(s), goods = shopGoods(s), t = tierIndex(s);
+    return `<div class="text-left mt-4">
+        <div class="font-black mb-1">🔧 設備升級</div>
+        ${UPGRADES.map(u => { const l = upLv(s, u.id), max = l >= 3, locked = !max && l > t;
+            return `<div class="flex items-center gap-2 py-1.5"><div class="text-2xl text-center" style="width:2.2rem">${u.e}</div>
+                <div class="flex-1 min-w-0"><div class="text-sm font-black">${u.name} <span style="color:var(--muted)">Lv.${l}/3</span></div><div class="text-xs" style="color:var(--muted)">${u.desc}</div></div>
+                ${max ? '<span class="text-xs" style="color:var(--muted)">已滿級</span>' : locked ? `<span class="text-xs" style="color:var(--muted)">店鋪 Lv.${TIER_LV[l]} 解鎖</span>` : `<button class="btn sm orange" ${S.coins >= UP_COST[l] ? '' : 'disabled'} onclick="buyUpgrade('${s.id}', '${u.id}')">💴 ${UP_COST[l]}</button>`}</div>`; }).join('')}
+        <div class="font-black mt-4 mb-1">👤 店員</div>
+        <button class="card p-2 w-full flex items-center gap-2 text-left" onclick="openStaffPicker('${s.id}')">
+            ${st ? `<div>${artHTML('critic_' + st.id, st.critic, 44)}</div><div class="flex-1 min-w-0"><div class="text-sm font-black">${st.criticName}・${SKILLS[STAFF_TYPE[st.id]].name}</div><div class="text-xs" style="color:var(--muted)">${SKILLS[STAFF_TYPE[st.id]].desc}</div></div>`
+                : '<div class="flex-1 text-sm" style="color:var(--muted)">還沒有店員。通過評鑑的評論家可以請來幫忙。</div>'}
+            <span class="text-xs font-black" style="color:var(--pri-d)">更換 ›</span></button>
+        <div class="font-black mt-4 mb-1">📦 上架商品 <span class="text-xs" style="color:var(--muted)">${goods.length}/${slots}・營業額 +${Math.round(goodsBonus(s) * 100)}%</span></div>
+        <div class="flex flex-wrap gap-1.5">${goods.length ? goods.map(k => { const d = S.dex[k], ok = goodFresh(d); return `<span class="pill jp" style="background:${ok ? 'var(--green-t)' : 'var(--red-t)'};color:${ok ? 'var(--green-d)' : 'var(--red-d)'}">${esc(d.word)} ${ok ? '★'.repeat(d.box || 0) : '過期'}</span>`; }).join('') : '<span class="text-sm" style="color:var(--muted)">貨架是空的，把學過的單字擺上來吧。</span>'}</div>
+        <button class="btn white sm w-full mt-2" onclick="openGoodsPicker('${s.id}')">管理上架商品</button>
+    </div>`;
+}
+function buyUpgrade(sid, uid) {
+    const s = S.shops.find(x => x.id === sid); if (!s) return;
+    const l = upLv(s, uid);
+    if (l >= 3 || l > tierIndex(s) || !spend(UP_COST[l])) return;
+    snapshotShop(s);
+    s.up = { ...(s.up || {}), [uid]: l + 1 };
+    S.totals.upgrades = (S.totals.upgrades || 0) + 1;
+    toast('🔧 升級完成！', 'good'); save(); openShopInfo(sid); if (G.tab === 'home') renderHome();
+}
+function openStaffPicker(sid) {
+    const s = S.shops.find(x => x.id === sid); if (!s) return;
+    const list = STREETS.filter(st => prog(st.id).boss);
+    const cur = staffOf(s);
+    showModal(`<h3 class="text-xl font-black">👤 幫「${esc(s.name)}」選店員</h3>
+        <p class="text-sm mt-1 mb-2" style="color:var(--muted)">通過一條街的評鑑，那位評論家就會成為常客，可以請來當店員。一位店員只能待在一間店。</p>
+        ${list.length ? list.map(st => { const at = S.shops.find(x => x.id === (S.staff || {})[st.id]); const on = cur && cur.id === st.id; const sk = SKILLS[STAFF_TYPE[st.id]];
+            return `<button class="card p-2 w-full flex items-center gap-2 text-left mt-2" style="${on ? 'border-color:var(--pri);background:var(--pri-t)' : ''}" onclick="assignStaff('${sid}', '${st.id}')">
+                <div>${artHTML('critic_' + st.id, st.critic, 48)}</div>
+                <div class="flex-1 min-w-0"><div class="text-sm font-black">${st.criticName}・${sk.name}</div><div class="text-xs" style="color:var(--muted)">${sk.desc}</div></div>
+                <span class="text-xs" style="color:var(--muted)">${on ? '在這間店 ✓' : at ? '在 ' + esc(at.name) : '待命中'}</span></button>`; }).join('')
+            : '<div class="text-center py-6" style="color:var(--muted)"><div class="text-5xl mb-2">🙇</div>還沒有常客。先到「商店街」通過第一位評論家的評鑑吧。</div>'}
+        <div class="grid grid-cols-2 gap-2 mt-4"><button class="btn white" onclick="openShopInfo('${sid}')">返回</button><button class="btn white" ${cur ? '' : 'disabled'} onclick="assignStaff('${sid}', null)">不派店員</button></div>`);
+}
+function assignStaff(sid, critId) {
+    const s = S.shops.find(x => x.id === sid); if (!s) return;
+    S.staff = S.staff || {};
+    S.shops.forEach(snapshotShop);
+    for (const k of Object.keys(S.staff)) if (S.staff[k] === sid) delete S.staff[k];
+    if (critId && prog(critId).boss) S.staff[critId] = sid;
+    playSound('tap'); save(); openShopInfo(sid); if (G.tab === 'home') renderHome();
+}
+function openGoodsPicker(sid) {
+    const s = S.shops.find(x => x.id === sid); if (!s) return;
+    const mine = shopGoods(s), slots = goodsSlots(s);
+    const where = {}; S.shops.forEach(x => { if (x.id !== sid) shopGoods(x).forEach(k => { where[k] = x.name; }); });
+    const list = Object.values(S.dex).sort((a, b) => (mine.includes(b.word) - mine.includes(a.word)) || ((b.box || 0) - (a.box || 0)));
+    G.goodsList = list.map(d => d.word);
+    showModal(`<h3 class="text-xl font-black">📦 「${esc(s.name)}」的貨架 ${mine.length}/${slots}</h3>
+        <p class="text-sm mt-1 mb-2" style="color:var(--muted)">每件商品依熟練度加營業額（每顆 ★ +4%）。到期沒盤點的商品會過期，不計加成。店鋪改裝後貨架會變大。</p>
+        ${list.length ? list.map((d, i) => { const on = mine.includes(d.word), ok = goodFresh(d);
+            return `<button class="card p-2 w-full flex items-center gap-2 text-left mt-1.5" style="${on ? 'border-color:var(--green);background:var(--green-t)' : ''}" onclick="toggleGood('${sid}', ${i})">
+                <div class="flex-1 min-w-0"><div class="jp font-black truncate">${esc(d.word)} <span class="text-xs" style="color:var(--muted)">${esc(d.mean)}</span></div>
+                <div class="text-xs" style="color:${ok ? 'var(--muted)' : 'var(--red-d)'}">${'★'.repeat(d.box || 0) || '☆'}${ok ? '' : '・過期，先去盤點'}${where[d.word] ? '・已在 ' + esc(where[d.word]) : ''}</div></div>
+                <span class="text-sm font-black" style="color:${on ? 'var(--green-d)' : 'var(--muted)'}">${on ? '已上架 ✓' : '上架'}</span></button>`; }).join('')
+            : '<div class="text-center py-6" style="color:var(--muted)"><div class="text-5xl mb-2">📦</div>商品帳還是空的，先去進貨吧。</div>'}
+        <button class="btn w-full mt-4" onclick="openShopInfo('${sid}')">完成</button>`);
+}
+function toggleGood(sid, i) {
+    const s = S.shops.find(x => x.id === sid), k = G.goodsList?.[i]; if (!s || !k) return;
+    const mine = shopGoods(s);
+    if (mine.includes(k)) s.goods = mine.filter(x => x !== k);
+    else {
+        if (mine.length >= goodsSlots(s)) return toast(`貨架滿了（${goodsSlots(s)} 格），先下架一件，或把店改裝到下一階段。`);
+        S.shops.forEach(x => { if (x.id !== sid && x.goods) x.goods = x.goods.filter(g => g !== k); });
+        s.goods = [...mine, k];
+    }
+    playSound('tap'); save();
+    const top = document.querySelector('.modal')?.scrollTop || 0;
+    openGoodsPicker(sid);
+    const m = document.querySelector('.modal'); if (m) m.scrollTop = top;
+}
 
 // 商店街等級：店鋪等級、評鑑與單字量累積成「發展度」
 const RANKS = [[0, '無名小巷'], [8, '街角商圈'], [20, '人氣商店街'], [40, '觀光名所'], [70, '傳說商店街']];
@@ -1062,7 +1178,7 @@ function checkRank() {
 }
 // 營業額：不在線上時店鋪照常營業，最多累積 8 小時；新鮮度和人氣越高賺越多
 const INCOME_CAP_H = 8;
-function incomeRate() { return S.shops.reduce((a, s) => a + [20, 45, 90][tierIndex(s)] * (.5 + freshness(s) / 200 + popularity(s) / 200), 0) * (1 + townRank() * .1); }
+function incomeRate() { return S.shops.reduce((a, s) => a + shopIncome(s), 0) * (1 + townRank() * .1); }
 function pendingIncome() { return S.lastCollect ? Math.floor(Math.min(INCOME_CAP_H, (Date.now() - S.lastCollect) / 3.6e6) * incomeRate()) : 0; }
 function collectIncome() {
     const n = pendingIncome();
@@ -1075,7 +1191,7 @@ function collectIncome() {
 function gainXp(s, n) {
     if (!s || n <= 0) return 0;
     const before = levelInfo(s).lv, tBefore = tierIndex(s);
-    const add = Math.max(1, Math.round(n * xpMultiplier(s) * (hasPerk('ramen') ? 1.1 : 1)));
+    const add = Math.max(1, Math.round(n * xpMultiplier(s) * (hasPerk('ramen') ? 1.1 : 1) * (staffSkill(s) === 'xp' ? 1.1 : 1)));
     s.xp += add;
     const after = levelInfo(s).lv;
     if (tierIndex(s) > tBefore) queueModal(() => showRenovate(s, tBefore));
@@ -1405,6 +1521,7 @@ function renderHomeStats() {
             ${bar('🍙', '新鮮度', f, 100, f < 25 ? 'var(--red)' : 'var(--orange)')}
             ${bar('😊', '人氣', p, 100, p < 30 ? 'var(--red)' : 'var(--blue)')}
         </div>
+        <button class="w-full text-xs text-center mt-2 border-0 bg-transparent" style="color:var(--muted)" onclick="openShopInfo('${s.id}')">👤 ${staffOf(s) ? staffOf(s).criticName : '沒有店員'}・📦 上架 ${shopGoods(s).length}/${goodsSlots(s)}・💰 每小時約 ${Math.round(shopIncome(s) * (1 + townRank() * .1))} ›</button>
         ${mult !== 1 ? `<div class="text-xs text-center mt-2 font-black" style="color:${mult > 1 ? 'var(--green-d)' : 'var(--red-d)'}">${mult > 1 ? `✨ 人氣很旺，評價 ×${mult.toFixed(1)}` : '😣 商品不新鮮，評價減半，先補貨吧'}</div>` : ''}`;
 }
 
@@ -2258,6 +2375,7 @@ function openShopInfo(id) {
             <div class="card p-2"><div class="font-black">${popularity(s)}%</div><div class="text-xs" style="color:var(--muted)">😊 人氣</div></div>
             <div class="card p-2"><div class="font-black">${'❤️'.repeat(hearts(s)) || '—'}</div><div class="text-xs" style="color:var(--muted)">💞 常客</div></div>
         </div>
+        ${shopManageHTML(s)}
         <div class="flex gap-2 mt-3"><input id="rename" class="field flex-1" maxlength="12" value="${esc(s.name)}"><button class="btn white sm" onclick="renameShop('${s.id}')">改名</button></div>
         <div class="grid grid-cols-2 gap-2 mt-3"><button class="btn white" onclick="closeModal()">關閉</button><button class="btn" ${on ? 'disabled' : ''} onclick="setActive('${s.id}')">${on ? '目前主力店' : '設為主力店'}</button></div>
     </div>`);
