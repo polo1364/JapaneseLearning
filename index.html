@@ -1634,7 +1634,7 @@ Rules:
 - "distractors": 3 plausible but WRONG Traditional Chinese meanings, all different from "mean".
 - "rarity": 1 (common), 2 (useful), or 3 (advanced for this level).
 - "notes": optional short Traditional Chinese tip about politeness, nuance or pronunciation.
-- "chunks": the "example" sentence split into 3-6 natural chunks in order (a word with its particle stays together). Joined together they must equal "example" exactly, including the final punctuation.${showRomaji() ? '\n- "exampleRomaji": Hepburn romaji of the whole "example" sentence, with spaces between words.' : ''}
+- "chunks": the "example" sentence split into 3-6 natural chunks in order (a word with its particle stays together). Joined together they must equal "example" exactly, including the final punctuation.${showRomaji() ? '\n- "exampleRomaji": Hepburn romaji of the whole "example" sentence, with spaces between words.\n- "chunkRomaji": array with the Hepburn romaji of each chunk, same length and same order as "chunks".' : ''}
 
 JSON shape:
 {"words":[{"word":"領収書","kana":"りょうしゅうしょ","romaji":"ryoushuusho","pos":"名詞","mean":"收據","example":"領収書をお願いします。","trans":"請給我收據。","distractors":["發票號碼","零錢","購物袋"],"rarity":2,"notes":"比レシート正式，報帳時用。","chunks":["領収書を","お願い","します。"]}]}`;
@@ -1694,6 +1694,8 @@ function cleanWords(words) {
         const strip = x => String(x).replace(/\s+/g, '');
         if (Array.isArray(w.chunks) && w.chunks.length >= 3 && w.chunks.length <= 7 && w.chunks.every(c => typeof c === 'string' && c.trim()) && w.chunks.map(strip).join('') === strip(w.example || '')) w.chunks = w.chunks.map(strip);
         else delete w.chunks;
+        if (w.chunks && Array.isArray(w.chunkRomaji) && w.chunkRomaji.length === w.chunks.length && w.chunkRomaji.every(c => typeof c === 'string' && c.trim())) w.chunkRomaji = w.chunkRomaji.map(c => c.trim());
+        else delete w.chunkRomaji;
         return true;
     }).slice(0, WORDS_PER_STAGE);
 }
@@ -2070,7 +2072,8 @@ function makeChallenge(w, type, pool) {
         case 'reverse': return { ...base, kind: 'choice', title: '客人要找的是哪一件商品？', big: w.mean, options: withRomaji(opts(w.word, othersOf(w, pool, 'word'), true), pool) };
         case 'reading': return { ...base, kind: 'choice', title: '這個字怎麼唸？', big: w.word, bigJp: true, options: opts(w.kana, othersOf(w, pool, 'kana'), true) };
         case 'exlisten': return { ...base, kind: 'choice', title: '聽例句，選出正確的意思', big: '🔊', audio: w.example, audioOnly: true, answerText: `${w.example}＝${w.trans}`, options: opts(w.trans, othersOf(w, pool, 'trans'), false) };
-        case 'sentence': return { ...base, kind: 'build', small: true, title: '把這句話排出來', big: w.trans, answerText: `${w.example}＝${w.trans}`, target: [...w.chunks], tiles: shuffle([...w.chunks]), picked: [] };
+        case 'sentence': { const order = shuffle(w.chunks.map((_, i) => i)); const rm = showRomaji() && Array.isArray(w.chunkRomaji) && w.chunkRomaji.length === w.chunks.length;
+            return { ...base, kind: 'build', small: true, title: '把這句話排出來', big: w.trans, answerText: `${w.example}＝${w.trans}`, target: [...w.chunks], tiles: order.map(i => w.chunks[i]), tileRm: rm ? order.map(i => w.chunkRomaji[i]) : null, picked: [] }; }
         case 'build': {
             const target = Array.from(w.kana);
             const kata = /[ァ-ヺ]/.test(w.kana);
@@ -2113,10 +2116,11 @@ function renderChallenge() {
 function replayAudio(slow) { const ch = G.play?.queue[G.play.pos]; if (ch?.audio) speak(ch.audio, slow); }
 function renderBuild() {
     const ch = G.play.queue[G.play.pos];
-    $('slots').innerHTML = ch.target.map((_, i) => { const t = ch.picked[i]; return `<button class="slot ${t != null ? 'filled' : ''} bg-transparent border-0" style="${ch.small ? 'font-size:1.05rem;' : ''}border-bottom:4px solid ${t != null ? 'var(--blue)' : '#d9cbb6'}" onclick="unpickTile(${i})">${t != null ? esc(ch.tiles[t]) : ''}</button>`; }).join('');
-    $('tiles').innerHTML = ch.tiles.map((c, i) => `<button class="tile ${ch.picked.includes(i) ? 'used' : ''}" style="${ch.small ? 'font-size:1.05rem' : ''}" onclick="pickTile(${i})">${esc(c)}</button>`).join('');
+    $('slots').innerHTML = ch.target.map((_, i) => { const t = ch.picked[i]; return `<button class="slot ${t != null ? 'filled' : ''} bg-transparent border-0" style="${ch.small ? 'font-size:1.05rem;' : ''}${ch.tileRm ? 'height:auto;min-height:3.4rem;line-height:1.25;padding:.2rem .15rem;' : ''}border-bottom:4px solid ${t != null ? 'var(--blue)' : '#d9cbb6'}" onclick="unpickTile(${i})">${t != null ? `<span>${esc(ch.tiles[t])}${tileRmHTML(ch, t)}</span>` : ''}</button>`; }).join('');
+    $('tiles').innerHTML = ch.tiles.map((c, i) => `<button class="tile ${ch.picked.includes(i) ? 'used' : ''}" style="${ch.small ? 'font-size:1.05rem;' : ''}${ch.tileRm ? 'height:auto;min-height:3.4rem;line-height:1.25;padding:.3rem .6rem' : ''}" onclick="pickTile(${i})"><span>${esc(c)}${tileRmHTML(ch, i)}</span></button>`).join('');
     const btn = $('confirm-btn'); if (btn) btn.disabled = ch.picked.length < ch.target.length;
 }
+function tileRmHTML(ch, i) { return ch.tileRm && ch.tileRm[i] ? `<small class="block" style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:none">${esc(ch.tileRm[i])}</small>` : ''; }
 function pickTile(i) { const p = G.play, ch = p.queue[p.pos]; if (p.locked || ch.picked.includes(i) || ch.picked.length >= ch.target.length) return; ch.picked.push(i); playSound('tap'); renderBuild(); }
 function unpickTile(i) { const p = G.play, ch = p.queue[p.pos]; if (p.locked || ch.picked[i] == null) return; ch.picked.splice(i, 1); renderBuild(); }
 function submitBuild() { const p = G.play, ch = p.queue[p.pos]; if (p.locked || ch.picked.length < ch.target.length) return; resolve(ch.picked.map(i => ch.tiles[i]).join('') === ch.target.join('')); }
@@ -2498,6 +2502,30 @@ function endMatch() {
     showResult({ icon: '🃏', title: '陳列完成！', lines: [`用了 ${p.moves} 步（最少 6 步）`, `💴 +${coins}・⭐ 評價 +${xp}`, '🍙 新鮮度 +10'], again: 'startMatch()' });
 }
 
+// ---------- 補齊已學單字的句子拼音 ----------
+async function backfillRomaji() {
+    if (G.backfilling || !showRomaji() || !apiKey || navigator.onLine === false) return;
+    const list = Object.values(S.dex).filter(d => Array.isArray(d.chunks) && d.chunks.length >= 3 && !(Array.isArray(d.chunkRomaji) && d.chunkRomaji.length === d.chunks.length)).slice(0, 30);
+    if (!list.length) return;
+    G.backfilling = true;
+    try {
+        const input = list.map((d, id) => ({ id, chunks: d.chunks }));
+        const data = await callClaudeJSON(JSON_SYSTEM, `Give the Hepburn romaji for each chunk of these Japanese sentences. Keep exactly the same number and order of chunks for every item.
+Input: ${JSON.stringify(input)}
+JSON shape: {"items":[{"id":0,"romaji":["onamae wa","nan","desu ka."]}]}`);
+        let n = 0;
+        for (const it of Array.isArray(data?.items) ? data.items : []) {
+            const d = list[it?.id];
+            if (!d || !S.dex[d.word] || !Array.isArray(it.romaji) || it.romaji.length !== d.chunks.length || !it.romaji.every(c => typeof c === 'string' && c.trim())) continue;
+            d.chunkRomaji = it.romaji.map(c => c.trim());
+            if (!d.exampleRomaji) d.exampleRomaji = d.chunkRomaji.join(' ');
+            n++;
+        }
+        if (n) save();
+    } catch {}
+    G.backfilling = false;
+}
+
 // ---------- 每日開店獎勵 ----------
 function checkLogin() {
     ensureDaily();
@@ -2840,7 +2868,7 @@ function renderMe() {
             <select class="field mt-1" onchange="S.style=this.value; G.prefetch={}; save(); renderMe()">${Object.entries(STYLES).map(([k, v]) => `<option value="${k}" ${S.style === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select>
             <span class="block text-xs mt-1" style="color:var(--muted)">${styleOf().hint}。改了之後，下一關進貨、下一份文法講義和下一段會話開始生效；已經學過的單字不會變。</span></label>
         <label class="block"><span class="text-sm">羅馬拼音</span>
-            <select class="field mt-1" onchange="S.romaji=this.value; G.prefetch={}; save(); renderMe()">${[['auto', '初階自動顯示（N5、N4）'], ['on', '一律顯示'], ['off', '不顯示']].map(([k, l]) => `<option value="${k}" ${(S.romaji || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+            <select class="field mt-1" onchange="S.romaji=this.value; G.prefetch={}; save(); renderMe(); backfillRomaji()">${[['auto', '初階自動顯示（N5、N4）'], ['on', '一律顯示'], ['off', '不顯示']].map(([k, l]) => `<option value="${k}" ${(S.romaji || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
             <span class="block text-xs mt-1" style="color:var(--muted)">目前${showRomaji() ? '會' : '不會'}顯示。考讀音的題目（選讀音、排假名、打字）不會顯示，以免直接看到答案。</span></label>
         <label class="block"><span class="text-sm">發音語速</span>
             <select class="field mt-1" onchange="S.rate=Number(this.value); save(); speak('こんにちは')">${[[.7, '慢'], [.85, '稍慢'], [1, '正常'], [1.15, '稍快']].map(([v, l]) => `<option value="${v}" ${S.rate === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -2959,7 +2987,7 @@ function saveKey() {
     apiKey = v;
     try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch {}
     G.prefetch = {};
-    closeModal(); toast(v ? 'API Key 已儲存 ✓' : '已移除 API Key', 'good'); render();
+    closeModal(); toast(v ? 'API Key 已儲存 ✓' : '已移除 API Key', 'good'); render(); backfillRomaji();
 }
 
 // ============================================================
@@ -3092,6 +3120,8 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) toast('🔄 已下載新版本，重新整理後生效', 'gold', 5000); });
     navigator.serviceWorker.register('sw.js').catch(() => {});
 }
+// 開啟幾秒後，在背景補齊已學單字缺少的句子拼音
+setTimeout(backfillRomaji, 4000);
 // 請瀏覽器不要自動清掉存檔
 if (S.shops.length) navigator.storage?.persist?.().catch(() => {});
 // App 圖示長按的捷徑：./?go=review、order、kana
