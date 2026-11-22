@@ -510,6 +510,8 @@ const ACHIEVEMENTS = [
     { id: 't3', icon: '🏯', name: '名店誕生', desc: '有一間店改裝到最終階段', v: () => S.shops.some(s => tierIndex(s) >= 2) ? 1 : 0, goal: 1, coins: 1500 },
     { id: 'ch20', icon: '💬', name: '能說會道', desc: '會話中用日文回 20 句', v: () => S.totals.chats, goal: 20, coins: 500 },
     { id: 'g10', icon: '📐', name: '文法修行', desc: '完成 10 次文法道場', v: () => S.totals.grammar, goal: 10, coins: 600 },
+    { id: 'ow10', icon: '🎓', name: '資深店主', desc: '店主升到 Lv.10', v: () => ownerLevel().lv, goal: 10, coins: 1000 },
+    { id: 'nr1', icon: '🎏', name: '開枝散葉', desc: '完成 1 次暖簾分け', v: () => S.totals.noren || 0, goal: 1, coins: 2000 },
     { id: 'br2', icon: '🧭', name: '各有風格', desc: '2 間店選了經營路線', v: () => S.shops.filter(s => s.branch && tierIndex(s) === 2).length, goal: 2, coins: 1500 },
     { id: 'loc3', icon: '📍', name: '黃金地段', desc: '3 間店開在適合的街上', v: () => S.shops.filter(s => s.loc && prog(s.loc).boss && LOC_PREF[s.type].includes(s.loc)).length, goal: 3, coins: 1000 },
     { id: 'h5', icon: '💞', name: '熟客滿座', desc: '一間店的常客達到 5 顆心', v: () => Math.max(0, ...S.shops.map(s => hearts(s))), goal: 5, coins: 1200 },
@@ -871,7 +873,7 @@ Object.assign(FLUENT, {
     "🧮": "Abacus|abacus", "🧳": "Luggage|luggage", "👔": "Necktie|necktie", "🥼": "Lab coat|lab_coat", "☂️": "Umbrella|umbrella", "🍁": "Maple leaf|maple_leaf",
     "🍂": "Fallen leaf|fallen_leaf", "🌰": "Chestnut|chestnut", "🍡": "Dango|dango", "🎆": "Fireworks|fireworks", "🎐": "Wind chime|wind_chime", "🍧": "Shaved ice|shaved_ice",
     "🚲": "Bicycle|bicycle", "🏬": "Department store|department_store", "🗼": "Tokyo tower|tokyo_tower", "🌟": "Glowing star|glowing_star", "💯": "Hundred points|hundred_points",
-    "🏘️": "Houses|houses", "📐": "Triangular ruler|triangular_ruler", "🏚️": "Derelict house|derelict_house", "🪧": "Placard|placard", "📝": "Memo|memo", "🈁": "Japanese here button|japanese_here_button", "🛎️": "Bellhop bell|bellhop_bell", "📰": "Newspaper|newspaper", "🎁": "Wrapped gift|wrapped_gift", "🧊": "Ice|ice", "🪑": "Chair|chair", "👤": "Bust in silhouette|bust_in_silhouette", "🙇": "!Person bowing|person_bowing"
+    "🏘️": "Houses|houses", "📐": "Triangular ruler|triangular_ruler", "🏚️": "Derelict house|derelict_house", "🪧": "Placard|placard", "📝": "Memo|memo", "🈁": "Japanese here button|japanese_here_button", "🛎️": "Bellhop bell|bellhop_bell", "🎏": "Carp streamer|carp_streamer", "📰": "Newspaper|newspaper", "🎁": "Wrapped gift|wrapped_gift", "🧊": "Ice|ice", "🪑": "Chair|chair", "👤": "Bust in silhouette|bust_in_silhouette", "🙇": "!Person bowing|person_bowing"
 });
 const FLUENT_CDN = 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/';
 function fluentUrl(e) {
@@ -966,7 +968,7 @@ function defaultState() {
         progress: {}, dex: {}, legacy: [], grammarSeen: [],
         daily: { date: '', new: 0, correct: 0, chat: 0, claimed: [] },
         totals: { correct: 0, answered: 0, stages: 0, chats: 0, critics: 0, grammar: 0, perfect: 0, kana: 0, orders: 0, matches: 0, stars: 0 },
-        ach: [], best: { rush: 0 }, staff: {}
+        ach: [], best: { rush: 0 }, staff: {}, skills: {}, ownerLv: 1
     };
 }
 function loadState() {
@@ -984,6 +986,7 @@ function loadState() {
         if (!LEVELS[s.level]) s.level = 'N5';
         if (!s.lastCollect) s.lastCollect = Date.now();
         if (!s.staff || typeof s.staff !== 'object' || Array.isArray(s.staff)) s.staff = {};
+        if (!s.skills || typeof s.skills !== 'object' || Array.isArray(s.skills)) s.skills = {};
         return s;
     }
     // 第一次開啟：把舊版 LinguaMax 的進度帶過來（舊資料保留不刪）
@@ -1003,7 +1006,7 @@ const G = { tab: 'home', play: null, modalQueue: [], prefetch: {}, chat: null, d
 fluentOn = S.fluent !== false;
 
 let save = function () {
-    checkAchievements(); checkRank();
+    checkAchievements(); checkRank(); checkOwner();
     safeSet(STORE_KEY, JSON.stringify(S));
     renderTop();
 };
@@ -1059,6 +1062,144 @@ function xpMultiplier(s) { if (freshness(s) < 20) return .5; return popularity(s
 function shopArt(s, px) { return artHTML(`shop_${s.type}_${tierIndex(s) + 1}`, typeOf(s).e, px); }
 function shopHTML(s, px) { return `<div class="shop-wrap" id="shop-wrap" onclick="pokeShop()"><span class="shop">${shopArt(s, px)}</span></div><div class="shadow"></div>`; }
 
+// ---------- 養成進階三：店主技能、暖簾分け、本週目標 ----------
+// 店主等級：累計答對題數換算，每升一級拿 1 技能點
+const SKILLS_TREE = [
+    { id: 'hint', e: '💡', name: '鑑定眼', max: 3, desc: l => `選擇題每輪可用 ${l} 次提示，刪掉一個錯的選項` },
+    { id: 'guard', e: '🛡️', name: '護身符', max: 2, desc: l => `評論家評鑑多 ${l} 顆心` },
+    { id: 'combo', e: '🔥', name: '連擊術', max: 2, desc: l => `進貨的連擊獎勵門檻降到 ${5 - l} 連擊，獎勵多 ${l * 50} 日圓` },
+    { id: 'memory', e: '📚', name: '記憶術', max: 3, desc: l => `進貨和盤點拿到的評價 +${l * 10}%` },
+    { id: 'voice', e: '📣', name: '好嗓門', max: 3, desc: l => `叫賣時間和接單每位客人的時間 +${l * 3} 秒` },
+    { id: 'haggle', e: '🧮', name: '殺價術', max: 3, desc: l => `市場食材和設備升級便宜 ${l * 5}%` }
+];
+const RESPEC_COST = 1000;
+const sk = id => (S.skills && S.skills[id]) || 0;
+function ownerLevel() {
+    let lv = 1, x = S.totals.correct, need = 20;
+    while (x >= need) { x -= need; lv++; need = 20 + (lv - 1) * 10; }
+    return { lv, cur: x, need };
+}
+function skillPoints() { return ownerLevel().lv - 1 - Object.values(S.skills || {}).reduce((a, b) => a + b, 0); }
+const comboNeed = () => 5 - sk('combo');
+const priceCut = () => 1 - sk('haggle') * .05;
+const upCost = l => Math.round(UP_COST[l] * priceCut());
+const orderTime = () => ORDER_TIME + sk('voice') * 3000;
+function checkOwner() {
+    const lv = ownerLevel().lv;
+    if (lv > (S.ownerLv || 1)) { S.ownerLv = lv; toast(`🎓 店主升到 Lv.${lv}！獲得技能點，到「我的」分頁學技能`, 'gold', 4000); }
+}
+function ownerHTML() {
+    const o = ownerLevel(), pts = skillPoints();
+    return `<div class="card p-4 mt-1 flex items-center gap-3" style="background:var(--pri-t);border-color:#f1c3b6"><div class="text-4xl">🎓</div>
+        <div class="flex-1 min-w-0"><div class="font-black">店主 Lv.${o.lv}</div>
+            <div class="bar mt-1" style="height:8px"><i style="width:${o.cur / o.need * 100}%;background:var(--pri)"></i></div>
+            <div class="text-xs mt-1" style="color:var(--muted)">再答對 ${o.need - o.cur} 題升級${pts > 0 ? `・有 ${pts} 點技能點可用` : ''}</div></div>
+        <button class="btn sm ${pts > 0 ? 'orange' : 'white'}" onclick="openSkills()">技能${pts > 0 ? ` (${pts})` : ''}</button></div>`;
+}
+function openSkills() {
+    const pts = skillPoints(), spent = Object.values(S.skills || {}).reduce((a, b) => a + b, 0);
+    showModal(`<div class="flex items-center justify-between"><h3 class="text-xl font-black">🎓 店主技能</h3><span class="pill" style="background:var(--pri-t);color:var(--pri-d)">技能點 ${pts}</span></div>
+        <p class="text-sm mt-1 mb-2" style="color:var(--muted)">店主每升一級拿 1 點（答對題目就會累積）。</p>
+        ${SKILLS_TREE.map(t => { const l = sk(t.id), max = l >= t.max;
+            return `<div class="flex items-center gap-2 py-2"><div class="text-2xl text-center" style="width:2.2rem">${t.e}</div>
+                <div class="flex-1 min-w-0"><div class="text-sm font-black">${t.name} <span style="color:var(--muted)">Lv.${l}/${t.max}</span></div>
+                <div class="text-xs" style="color:var(--muted)">${l ? '目前：' + t.desc(l) : '還沒學'}${max ? '' : `<br>下一級：${t.desc(l + 1)}`}</div></div>
+                ${max ? '<span class="text-xs" style="color:var(--muted)">已學滿</span>' : `<button class="btn sm" ${pts > 0 ? '' : 'disabled'} onclick="learnSkill('${t.id}')">學習</button>`}</div>`; }).join('')}
+        <div class="grid grid-cols-2 gap-2 mt-3"><button class="btn white" onclick="closeModal(); if (G.tab === 'me') renderMe()">關閉</button><button class="btn white" ${spent && S.coins >= RESPEC_COST ? '' : 'disabled'} onclick="respecSkills()">重學 💴 ${RESPEC_COST}</button></div>`);
+}
+function learnSkill(id) {
+    const t = SKILLS_TREE.find(x => x.id === id);
+    if (!t || skillPoints() < 1 || sk(id) >= t.max) return;
+    S.skills = { ...(S.skills || {}), [id]: sk(id) + 1 };
+    playSound('ok'); save(); openSkills();
+}
+function respecSkills() {
+    if (!Object.keys(S.skills || {}).length || !spend(RESPEC_COST)) return;
+    S.skills = {}; save(); openSkills(); toast('技能點已全部退回。', 'good');
+}
+function hintBtnHTML() {
+    const p = G.play, ch = p?.queue[p.pos];
+    if (!p || p.mode === 'rush' || !ch?.options || !(p.hints > 0) || ch.options.filter(o => !o.ok && !o.cut).length < 2) return '';
+    return `<button class="btn white w-full" onclick="useHint()">💡 提示：刪掉一個錯的選項（剩 ${p.hints} 次）</button>`;
+}
+function useHint() {
+    const p = G.play; if (!p || p.locked || !(p.hints > 0)) return;
+    const ch = p.queue[p.pos];
+    const wrong = ch.options.map((o, i) => [o, i]).filter(([o]) => !o.ok && !o.cut);
+    if (wrong.length < 2) return;
+    const [o, i] = pick(wrong);
+    o.cut = true; p.hints--;
+    const b = document.querySelector(`#play-body .opt[data-i="${i}"]`);
+    if (b) { b.disabled = true; b.style.opacity = '.35'; }
+    playSound('tap'); $('play-foot').innerHTML = hintBtnHTML();
+}
+
+// 暖簾分け：店鋪 Lv.20 後可以把招牌傳出去，回到 Lv.1 換永久加成，最多 5 次
+const NOREN_LV = 20, NOREN_MAX = 5;
+const noren = s => s.noren || 0;
+function norenHTML(s) {
+    const lv = levelInfo(s).lv, n = noren(s);
+    return `<div class="font-black mt-4 mb-1">🎏 暖簾分け ${n ? `<span style="color:var(--gold-d)">${'★'.repeat(n)}</span>` : ''}</div>
+        <div class="text-sm" style="color:var(--muted)">${n ? `目前永久加成：營業額 +${n * 25}%、評價 +${n * 10}%。` : ''}${n >= NOREN_MAX ? '已經傳到最高代了。' : `店鋪到 Lv.${NOREN_LV} 可以暖簾分け：回到 Lv.1，換永久的營業額 +25%、評價 +10%（設備、店員、店址會保留）。`}</div>
+        ${n >= NOREN_MAX ? '' : `<button class="btn ${lv >= NOREN_LV ? 'orange' : 'white'} sm w-full mt-2" ${lv >= NOREN_LV ? '' : 'disabled'} onclick="confirmNoren('${s.id}')">${lv >= NOREN_LV ? '🎏 暖簾分け' : `還差 ${NOREN_LV - lv} 級（目前 Lv.${lv}）`}</button>`}`;
+}
+function confirmNoren(sid) {
+    const s = S.shops.find(x => x.id === sid); if (!s || levelInfo(s).lv < NOREN_LV || noren(s) >= NOREN_MAX) return;
+    const n = noren(s) + 1;
+    showModal(`<div class="text-center"><div class="text-6xl">🎏</div><h3 class="text-xl font-black mt-2">要讓「${esc(s.name)}」暖簾分け嗎？</h3>
+        <p class="text-sm mt-2" style="color:var(--muted)">店鋪會回到 Lv.1 的第一階段，貨架變回 2 格，經營路線要等再次改裝到最終階段才生效。設備、店員、店址、常客都會保留。</p>
+        <div class="mt-3 font-black space-y-1"><div>永久營業額 +${n * 25}%、評價 +${n * 10}%</div><div>💴 +${n * 2000}</div></div>
+        <div class="grid grid-cols-2 gap-2 mt-4"><button class="btn white" onclick="openShopInfo('${sid}')">再想想</button><button class="btn orange" onclick="doNoren('${sid}')">暖簾分け</button></div></div>`, { sticky: true });
+}
+function doNoren(sid) {
+    const s = S.shops.find(x => x.id === sid); if (!s || levelInfo(s).lv < NOREN_LV || noren(s) >= NOREN_MAX) return;
+    snapshotShop(s);
+    s.noren = noren(s) + 1; s.xp = 0;
+    S.coins += s.noren * 2000; S.totals.noren = (S.totals.noren || 0) + 1;
+    $('top-shop').dataset.key = '';
+    playSound('win'); burst(); save(); closeModal(); render();
+    toast(`🎏 ${s.name} 完成第 ${s.noren} 次暖簾分け！`, 'gold', 4000);
+}
+
+// 本週目標：週一重置，四項都領完還有大獎
+const WEEKLY = [
+    { id: 'new', icon: '📦', text: '進貨 30 件新商品', target: 30, reward: 800 },
+    { id: 'correct', icon: '✅', text: '答對 150 題', target: 150, reward: 800 },
+    { id: 'orders', icon: '🛎️', text: '接單接待 25 位客人', target: 25, reward: 600 },
+    { id: 'review', icon: '📚', text: '盤點第一次就答對 40 題', target: 40, reward: 600 }
+];
+function weekId() { const d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return dateStr(d); }
+function wk() {
+    const id = weekId();
+    if (!S.weekly || S.weekly.id !== id) S.weekly = { id, new: 0, correct: 0, orders: 0, review: 0, claimed: [] };
+    return S.weekly;
+}
+function weeklyHTML() {
+    const w = wk(), all = WEEKLY.every(q => w.claimed.includes(q.id)), grand = w.claimed.includes('grand');
+    return `<div class="card p-4 mt-4">
+        <div class="flex items-center justify-between mb-3"><h3 class="font-black text-lg">🗓️ 本週目標</h3><span class="text-xs" style="color:var(--muted)">每週一重置</span></div>
+        <div class="space-y-3">${WEEKLY.map(q => { const v = Math.min(w[q.id] || 0, q.target), done = v >= q.target, claimed = w.claimed.includes(q.id);
+            return `<div class="flex items-center gap-3"><div class="text-2xl w-9 text-center">${q.icon}</div>
+                <div class="flex-1 min-w-0"><div class="text-sm font-black">${q.text}</div>
+                    <div class="flex items-center gap-2 mt-1"><div class="bar flex-1" style="height:10px"><i style="width:${v / q.target * 100}%;background:var(--indigo)"></i></div><span class="text-xs" style="color:var(--muted)">${v}/${q.target}</span></div></div>
+                ${claimed ? '<span class="text-sm" style="color:var(--muted)">已領取 ✓</span>' : `<button class="btn sm ${done ? 'orange' : ''}" ${done ? '' : 'disabled'} onclick="claimWeekly('${q.id}')">💴 ${q.reward}</button>`}</div>`; }).join('')}</div>
+        <div class="rounded-2xl p-3 mt-3 flex items-center gap-3" style="background:#fffbea"><div class="text-2xl">🎁</div>
+            <div class="flex-1 text-sm"><span class="font-black">全部完成的大獎</span><span class="block text-xs" style="color:var(--muted)">💴 1500・🥩 頂級和牛 ×2</span></div>
+            ${grand ? '<span class="text-sm" style="color:var(--muted)">已領取 ✓</span>' : `<button class="btn sm ${all ? 'orange' : ''}" ${all ? '' : 'disabled'} onclick="claimWeekly('grand')">領取</button>`}</div>
+    </div>`;
+}
+function claimWeekly(id) {
+    const w = wk(); if (w.claimed.includes(id)) return;
+    if (id === 'grand') {
+        if (!WEEKLY.every(q => w.claimed.includes(q.id))) return;
+        S.coins += 1500; S.supplies.wagyu = (S.supplies.wagyu || 0) + 2;
+    } else {
+        const q = WEEKLY.find(x => x.id === id); if (!q || (w[id] || 0) < q.target) return;
+        S.coins += q.reward;
+    }
+    w.claimed.push(id); playSound('coin'); burst(); save(); renderHome();
+}
+
 // ---------- 養成進階二：常客送禮、經營路線、店址、今日話題 ----------
 // 今日話題：每天輪替一個全店加成，依日期決定
 const DAILY_TOPICS = [
@@ -1071,7 +1212,7 @@ const DAILY_TOPICS = [
 ];
 function todayTopic() { const n = [...dateStr()].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7); return DAILY_TOPICS[n % DAILY_TOPICS.length]; }
 const topicIs = id => todayTopic().id === id;
-const supplyPrice = x => Math.round(x.price * (topicIs('market') ? .8 : 1));
+const supplyPrice = x => Math.round(x.price * (topicIs('market') ? .8 : 1) * priceCut());
 // 經營路線：店鋪到最終階段後二選一，第一次免費，之後轉換要 2000 日圓
 const BRANCHES = {
     shinise: { e: '🏯', name: '老舖路線', desc: '營業額 +20%，常客好感獲得 ×2' },
@@ -1181,7 +1322,7 @@ function shopGoods(s) { return (s.goods || []).filter(k => S.dex[k]).slice(0, go
 function goodFresh(d) { return !d.due || d.due >= dateStr(); }
 function goodsBonus(s) { return shopGoods(s).reduce((a, k) => { const d = S.dex[k]; return a + (goodFresh(d) ? (d.box || 0) * .04 : 0); }, 0); }
 function shopIncome(s) {
-    return [20, 45, 90][tierIndex(s)] * (.5 + freshness(s) / 200 + popularity(s) / 200) * (1 + .2 * upLv(s, 'seat')) * (staffSkill(s) === 'income' ? 1.15 : 1) * (1 + goodsBonus(s)) * (s.branch === 'shinise' && tierIndex(s) === 2 ? 1.2 : 1) * (1 + locBonus(s)) * (topicIs('sale') ? 1.3 : 1);
+    return [20, 45, 90][tierIndex(s)] * (.5 + freshness(s) / 200 + popularity(s) / 200) * (1 + .2 * upLv(s, 'seat')) * (staffSkill(s) === 'income' ? 1.15 : 1) * (1 + goodsBonus(s)) * (s.branch === 'shinise' && tierIndex(s) === 2 ? 1.2 : 1) * (1 + locBonus(s)) * (topicIs('sale') ? 1.3 : 1) * (1 + noren(s) * .25);
 }
 function shopManageHTML(s) {
     const st = staffOf(s), slots = goodsSlots(s), goods = shopGoods(s), t = tierIndex(s);
@@ -1191,7 +1332,7 @@ function shopManageHTML(s) {
         ${UPGRADES.map(u => { const l = upLv(s, u.id), max = l >= 3, locked = !max && l > t;
             return `<div class="flex items-center gap-2 py-1.5"><div class="text-2xl text-center" style="width:2.2rem">${u.e}</div>
                 <div class="flex-1 min-w-0"><div class="text-sm font-black">${u.name} <span style="color:var(--muted)">Lv.${l}/3</span></div><div class="text-xs" style="color:var(--muted)">${u.desc}</div></div>
-                ${max ? '<span class="text-xs" style="color:var(--muted)">已滿級</span>' : locked ? `<span class="text-xs" style="color:var(--muted)">店鋪 Lv.${TIER_LV[l]} 解鎖</span>` : `<button class="btn sm orange" ${S.coins >= UP_COST[l] ? '' : 'disabled'} onclick="buyUpgrade('${s.id}', '${u.id}')">💴 ${UP_COST[l]}</button>`}</div>`; }).join('')}
+                ${max ? '<span class="text-xs" style="color:var(--muted)">已滿級</span>' : locked ? `<span class="text-xs" style="color:var(--muted)">店鋪 Lv.${TIER_LV[l]} 解鎖</span>` : `<button class="btn sm orange" ${S.coins >= upCost(l) ? '' : 'disabled'} onclick="buyUpgrade('${s.id}', '${u.id}')">💴 ${upCost(l)}</button>`}</div>`; }).join('')}
         <div class="font-black mt-4 mb-1">👤 店員</div>
         <button class="card p-2 w-full flex items-center gap-2 text-left" onclick="openStaffPicker('${s.id}')">
             ${st ? `<div>${artHTML('critic_' + st.id, st.critic, 44)}</div><div class="flex-1 min-w-0"><div class="text-sm font-black">${st.criticName}・${SKILLS[STAFF_TYPE[st.id]].name}</div><div class="text-xs" style="color:var(--muted)">${SKILLS[STAFF_TYPE[st.id]].desc}</div></div>`
@@ -1200,12 +1341,13 @@ function shopManageHTML(s) {
         <div class="font-black mt-4 mb-1">📦 上架商品 <span class="text-xs" style="color:var(--muted)">${goods.length}/${slots}・營業額 +${Math.round(goodsBonus(s) * 100)}%</span></div>
         <div class="flex flex-wrap gap-1.5">${goods.length ? goods.map(k => { const d = S.dex[k], ok = goodFresh(d); return `<span class="pill jp" style="background:${ok ? 'var(--green-t)' : 'var(--red-t)'};color:${ok ? 'var(--green-d)' : 'var(--red-d)'}">${esc(d.word)} ${ok ? '★'.repeat(d.box || 0) : '過期'}</span>`; }).join('') : '<span class="text-sm" style="color:var(--muted)">貨架是空的，把學過的單字擺上來吧。</span>'}</div>
         <button class="btn white sm w-full mt-2" onclick="openGoodsPicker('${s.id}')">管理上架商品</button>
+        ${norenHTML(s)}
     </div>`;
 }
 function buyUpgrade(sid, uid) {
     const s = S.shops.find(x => x.id === sid); if (!s) return;
     const l = upLv(s, uid);
-    if (l >= 3 || l > tierIndex(s) || !spend(UP_COST[l])) return;
+    if (l >= 3 || l > tierIndex(s) || !spend(upCost(l))) return;
     snapshotShop(s);
     s.up = { ...(s.up || {}), [uid]: l + 1 };
     S.totals.upgrades = (S.totals.upgrades || 0) + 1;
@@ -1291,7 +1433,7 @@ function collectIncome() {
 function gainXp(s, n) {
     if (!s || n <= 0) return 0;
     const before = levelInfo(s).lv, tBefore = tierIndex(s);
-    const add = Math.max(1, Math.round(n * xpMultiplier(s) * (hasPerk('ramen') ? 1.1 : 1) * (staffSkill(s) === 'xp' ? 1.1 : 1) * (1 + hearts(s) * .03) * (topicIs('gourmet') ? 1.2 : 1)));
+    const add = Math.max(1, Math.round(n * xpMultiplier(s) * (hasPerk('ramen') ? 1.1 : 1) * (staffSkill(s) === 'xp' ? 1.1 : 1) * (1 + hearts(s) * .03) * (topicIs('gourmet') ? 1.2 : 1) * (1 + noren(s) * .1)));
     s.xp += add;
     const after = levelInfo(s).lv;
     if (tierIndex(s) > tBefore) queueModal(() => showRenovate(s, tBefore));
@@ -1717,7 +1859,8 @@ function renderHome() {
                     : `<button class="btn sm ${done ? 'orange' : ''}" ${done ? '' : 'disabled'} onclick="claimQuest('${q.id}')">💴 ${q.reward}</button>`}
             </div>`; }).join('')}
         </div>
-    </div>`;
+    </div>
+    ${weeklyHTML()}`;
     renderHomeStats();
 }
 
@@ -1853,12 +1996,12 @@ function quitPlay() {
     if (p.loading || p.done || p.mode === 'rush' || confirm('要離開嗎？這一輪的進度不會保留。')) { if (p.mode === 'rush' && !p.done) return endRush(); closePlay(); }
 }
 function makeRun(mode, extra = {}) {
-    return { mode, queue: [], pos: 0, wrong: 0, combo: 0, maxCombo: 0, first: 0, hearts: 3, locked: false, ...extra };
+    return { mode, queue: [], pos: 0, wrong: 0, combo: 0, maxCombo: 0, first: 0, hearts: 3, maxHearts: 3, hints: sk('hint'), locked: false, ...extra };
 }
 function renderHead() {
     const p = G.play;
     const pct = p.queue.length ? p.pos / p.queue.length * 100 : 0;
-    const right = p.mode === 'critic' ? `<span class="font-black whitespace-nowrap">${'❤️'.repeat(Math.max(0, p.hearts))}${'🤍'.repeat(3 - Math.max(0, p.hearts))}</span>`
+    const right = p.mode === 'critic' ? `<span class="font-black whitespace-nowrap">${'❤️'.repeat(Math.max(0, p.hearts))}${'🤍'.repeat(Math.max(0, p.maxHearts - Math.max(0, p.hearts)))}</span>`
         : p.mode === 'rush' ? `<span class="pill" style="background:#fff6d6;color:#a67c00">📣 ${p.first}</span>`
         : p.combo >= 2 ? `<span class="pill" style="background:var(--orange-t);color:var(--orange-d)">🔥 ${p.combo}</span>` : '';
     $('play-head').innerHTML = `<button class="border-0 bg-transparent text-2xl font-black px-1" style="color:var(--muted)" onclick="quitPlay()" aria-label="離開">✕</button>
@@ -1928,7 +2071,7 @@ function renderChallenge() {
         : `<div class="${ch.bigJp ? 'jp text-4xl' : 'text-3xl'} font-black" style="word-break:break-word">${esc(ch.big)}</div>${ch.sub ? `<div class="jp mt-1" style="color:var(--muted)">${esc(ch.sub)}</div>` : ''}${ch.zh ? `<div class="text-sm mt-1" style="color:var(--muted)">${esc(ch.zh)}</div>` : ''}${ch.audio ? `<button class="btn white sm mt-3" onclick="replayAudio()">🔊 聽發音</button>` : ''}`;
     let inner = '';
     if (ch.kind === 'choice' || ch.kind === 'grammar') {
-        inner = `<div class="space-y-2.5">${ch.options.map((o, i) => `<button class="opt ${o.jp ? 'jp' : ''}" data-i="${i}" onclick="answerOption(${i})"><span class="k">${i + 1}</span><span>${esc(o.label)}</span></button>`).join('')}</div>`;
+        inner = `<div class="space-y-2.5">${ch.options.map((o, i) => `<button class="opt ${o.jp ? 'jp' : ''}" data-i="${i}" ${o.cut ? 'disabled style="opacity:.35"' : ''} onclick="answerOption(${i})"><span class="k">${i + 1}</span><span>${esc(o.label)}</span></button>`).join('')}</div>`;
     } else if (ch.kind === 'build') {
         inner = `<div id="slots" class="flex flex-wrap justify-center mb-6 jp" style="min-height:3.4rem"></div><div id="tiles" class="flex flex-wrap justify-center gap-2 jp"></div>`;
     } else if (ch.kind === 'type') {
@@ -1939,7 +2082,7 @@ function renderChallenge() {
         <div class="text-sm font-black mb-3" style="color:var(--muted)">${ch.retry ? '🔁 再試一次・' : ''}${esc(ch.title)}</div>
         <div class="card p-5 text-center mb-4">${big}</div>${inner}</div>`;
     $('play-foot').innerHTML = ch.kind === 'build' ? `<button id="confirm-btn" class="btn w-full text-lg" disabled onclick="submitBuild()">確認</button>`
-        : ch.kind === 'type' ? `<button class="btn w-full text-lg" onclick="submitType()">確認</button>` : '';
+        : ch.kind === 'type' ? `<button class="btn w-full text-lg" onclick="submitType()">確認</button>` : hintBtnHTML();
     if (ch.kind === 'build') renderBuild();
     if (ch.kind === 'type') setTimeout(() => $('type-in')?.focus(), 80);
     if (ch.audio && (ch.audioOnly || p.mode !== 'rush')) setTimeout(() => { if (G.play === p && p.queue[p.pos] === ch) speak(ch.audio); }, 250);
@@ -1963,7 +2106,7 @@ function submitType() {
 }
 function answerOption(i) {
     const p = G.play; if (!p || p.locked) return;
-    const ch = p.queue[p.pos], o = ch?.options?.[i]; if (!o) return;
+    const ch = p.queue[p.pos], o = ch?.options?.[i]; if (!o || o.cut) return;
     document.querySelectorAll('#play-body .opt').forEach((b, j) => { b.disabled = true; if (ch.options[j].ok) b.classList.add('ok'); else if (j === i) b.classList.add('bad'); });
     resolve(o.ok);
 }
@@ -1985,7 +2128,7 @@ function resolve(ok) {
     if (p.timer && p.mode !== 'rush') { clearInterval(p.timer); p.timer = null; }
     S.totals.answered++; markActive(); ensureDaily();
     if (ok) {
-        S.totals.correct++; S.daily.correct++; progressLots(1);
+        S.totals.correct++; S.daily.correct++; wk().correct++; progressLots(1);
         p.combo++; p.maxCombo = Math.max(p.maxCombo, p.combo);
         if (!ch.retry) p.first++;
         if (p.mode === 'kana') S.totals.kana++;
@@ -2111,7 +2254,7 @@ function startCritic(id, hard = false) {
     const words = streetWords(id);
     if (words.length < 4) return toast('這條街的商品太少，評論家還不想來。');
     const pool = wordPool([]);
-    G.play = makeRun('critic', { street, pool, hard });
+    G.play = makeRun('critic', { street, pool, hard, hearts: 3 + sk('guard'), maxHearts: 3 + sk('guard') });
     const pickType = w => hard ? pick(typesFor(w, pool).filter(t => ['build', 'type', 'sentence'].includes(t))) : pick(typesFor(w, pool, true));
     G.play.queue = shuffle(words).slice(0, 10).map(w => withSay(makeChallenge(w, pickType(w), pool)));
     openPlay();
@@ -2119,7 +2262,7 @@ function startCritic(id, hard = false) {
     $('play-foot').innerHTML = `<button class="btn w-full text-lg red" onclick="renderChallenge()">接受評鑑！</button>`;
     $('play-body').innerHTML = `<div class="text-center pt-16 anim-in"><div class="reveal">${artHTML('critic_' + id, street.critic, 170)}</div>
         <div class="text-2xl font-black mt-4">${hard ? '🌟 星級評鑑：' : ''}${street.criticName}來訪！</div>
-        <p class="mt-2" style="color:var(--muted)">共 ${G.play.queue.length} 題，每題 ${(hasPerk('ekiben') ? 20 : 15) + (hard ? 10 : 0)} 秒，答錯 3 次就會被打低分。${hard ? '這次沒有選項，全部要自己寫出來。' : ''}</p></div>`;
+        <p class="mt-2" style="color:var(--muted)">共 ${G.play.queue.length} 題，每題 ${(hasPerk('ekiben') ? 20 : 15) + (hard ? 10 : 0)} 秒，答錯 ${G.play.maxHearts} 次就會被打低分。${hard ? '這次沒有選項，全部要自己寫出來。' : ''}</p></div>`;
 }
 function kanaPool(script) {
     const ex = KANA_EXTRA[script];
@@ -2184,7 +2327,7 @@ function rushChallenge() {
 function startRush() {
     const p = G.play = makeRun('rush', { pool: wordPool([]) });
     if (dexCount() < 4) p.kana = kanaPool('hiragana');
-    p.dur = hasPerk('yatai') ? 35000 : 30000;
+    p.dur = (hasPerk('yatai') ? 35000 : 30000) + sk('voice') * 3000;
     p.endAt = Date.now() + p.dur;
     p.queue = [rushChallenge()];
     openPlay(); renderChallenge();
@@ -2229,8 +2372,8 @@ function nextOrder() {
     setTimeout(() => { if (G.play === p) speak(p.cur.line); }, 250);
     const t0 = Date.now(), cur = p.cur;
     p.timer = setInterval(() => {
-        const left = ORDER_TIME - (Date.now() - t0), el = $('q-timer');
-        if (el) el.style.width = Math.max(0, left / ORDER_TIME * 100) + '%';
+        const left = orderTime() - (Date.now() - t0), el = $('q-timer');
+        if (el) el.style.width = Math.max(0, left / orderTime() * 100) + '%';
         if (left <= 0) {
             clearInterval(p.timer); p.timer = null; p.locked = true;
             toast('客人等太久，走掉了…', 'bad', 1400); playSound('bad');
@@ -2257,7 +2400,7 @@ function pickOrder(i) {
     const c = p.cur, w = c.shelf[i]; if (!w || c.got.includes(i) || c.bad.includes(i)) return;
     S.totals.answered++; markActive(); ensureDaily();
     if (c.want.includes(w)) {
-        c.got.push(i); S.totals.correct++; S.daily.correct++; progressLots(1);
+        c.got.push(i); S.totals.correct++; S.daily.correct++; wk().correct++; progressLots(1);
         const d = S.dex[w.word]; if (d) d.correct = (d.correct || 0) + 1;
         playSound('ok');
         if (c.got.length === c.want.length) {
@@ -2273,7 +2416,7 @@ function pickOrder(i) {
 function endOrder() {
     const p = G.play, s = activeShop();
     p.coins = Math.round(p.coins * tipMult(s) * (topicIs('tv') ? 2 : 1));
-    S.coins += p.coins; S.totals.orders = (S.totals.orders || 0) + p.served;
+    S.coins += p.coins; S.totals.orders = (S.totals.orders || 0) + p.served; wk().orders += p.served;
     setPop(s, popularity(s) + p.served * 5); addBond(s, p.served);
     const xp = gainXp(s, p.served * 3);
     save(); playSound('win'); if (p.served === p.total) burst();
@@ -2370,13 +2513,13 @@ function finishRun() {
         const fresh = p.words.filter(w => !S.dex[w.word]);
         const today = dateStr();
         for (const w of fresh) S.dex[w.word] = { ...w, street: p.street.id, caught: today, correct: 1, wrong: 0, box: 1, due: addDays(1), needFix: false };
-        const coins = Math.round((100 + stars * 50 + (p.maxCombo >= 5 ? 100 : 0)) * (hasPerk('konbini') ? 1.2 : 1));
-        const xp = gainXp(s, fresh.length * 8 + stars * 4);
+        const coins = Math.round((100 + stars * 50 + (p.maxCombo >= comboNeed() ? 100 + sk('combo') * 50 : 0)) * (hasPerk('konbini') ? 1.2 : 1));
+        const xp = gainXp(s, (fresh.length * 8 + stars * 4) * (1 + sk('memory') * .1));
         S.coins += coins; S.supplies.rice = (S.supplies.rice || 0) + fresh.length;
-        S.daily.new += fresh.length; S.totals.stages++; if (stars === 3) S.totals.perfect++;
+        S.daily.new += fresh.length; wk().new += fresh.length; S.totals.stages++; if (stars === 3) S.totals.perfect++;
         const pr = prog(p.street.id); pr.stars[p.idx] = Math.max(pr.stars[p.idx], stars);
         addBond(s, 1); save(); playSound('win'); if (stars === 3) burst();
-        return showResult({ icon: '📦', title: '進貨完成！', stars, lines: [`新商品 ${fresh.length} 件上架`, `💴 +${coins}${p.maxCombo >= 5 ? '（連擊獎勵）' : ''}`, `⭐ 評價 +${xp}・🍙 食材 +${fresh.length}`] });
+        return showResult({ icon: '📦', title: '進貨完成！', stars, lines: [`新商品 ${fresh.length} 件上架`, `💴 +${coins}${p.maxCombo >= comboNeed() ? '（連擊獎勵）' : ''}`, `⭐ 評價 +${xp}・🍙 食材 +${fresh.length}`] });
     }
     if (p.mode === 'critic') {
         const win = p.hearts > 0, pr = prog(p.street.id);
@@ -2405,8 +2548,8 @@ function finishRun() {
     }
     const n = p.first;
     if (p.mode === 'review') {
-        const coins = n * 10 * (hasPerk('sushi') ? 2 : 1) * (topicIs('rain') ? 2 : 1), xp = gainXp(s, n * 2);
-        S.coins += coins; setFresh(s, freshness(s) + n * 3);
+        const coins = n * 10 * (hasPerk('sushi') ? 2 : 1) * (topicIs('rain') ? 2 : 1), xp = gainXp(s, n * 2 * (1 + sk('memory') * .1));
+        S.coins += coins; setFresh(s, freshness(s) + n * 3); wk().review += n;
         save(); playSound('win');
         return showResult({ icon: '📚', title: '盤點完成！', lines: [`第一次就答對 ${n}/${p.queue.filter(c => !c.retry).length} 題`, `💴 +${coins}・⭐ 評價 +${xp}`, `🍙 新鮮度 +${n * 3}`] });
     }
@@ -2472,7 +2615,7 @@ function openShopInfo(id) {
     const s = S.shops.find(x => x.id === id); if (!s) return;
     const li = levelInfo(s), nt = nextTierLv(s), on = s.id === activeShop().id;
     showModal(`<div class="text-center">${shopArt(s, 140)}
-        <h3 class="text-2xl font-black mt-2">${esc(s.name)}</h3>
+        <h3 class="text-2xl font-black mt-2">${esc(s.name)}${noren(s) ? ` <span style="color:var(--gold-d)">${'★'.repeat(noren(s))}</span>` : ''}</h3>
         <div class="text-sm" style="color:var(--muted)">${typeOf(s).name}・Lv.${li.lv} ${tierName(s)}${nt ? `・Lv.${nt} 改裝` : '・最終階段'}</div>
         <div class="pill mt-2" style="background:var(--pri-t);color:var(--pri-d)">✨ 特性：${PERKS[s.type]}</div>
         <div class="grid grid-cols-3 gap-2 mt-3 text-sm">
@@ -2658,7 +2801,8 @@ function renderMe() {
     const stat = (v, l) => `<div class="card p-3 text-center"><div class="text-2xl font-black">${v}</div><div class="text-xs" style="color:var(--muted)">${l}</div></div>`;
     const known = MODELS.some(m => m[0] === model);
     $('tab-me').innerHTML = `
-    <div class="grid grid-cols-2 gap-2 mt-1">
+    ${ownerHTML()}
+    <div class="grid grid-cols-2 gap-2 mt-4">
         ${stat(dexCount(), '📒 已收錄單字')}${stat(S.streak + ' 天', '🔥 連續學習')}${stat(acc + '%', '✅ 答對率')}${stat(S.shops.length + ' 間', '🏘️ 店鋪')}
         ${stat(S.totals.critics + '/' + STREETS.length, '👑 通過評鑑')}${stat(S.totals.chats, '💬 會話句數')}
     </div>
