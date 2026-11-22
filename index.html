@@ -999,11 +999,11 @@ let model = safeGet(MODEL_STORE) || DEFAULT_MODEL;
 const G = { tab: 'home', play: null, modalQueue: [], prefetch: {}, chat: null, dexView: 'words', dexFilter: 'all', dexQuery: '', kanaScript: 'hiragana', shopTab: 'supply', gramAll: false };
 fluentOn = S.fluent !== false;
 
-function save() {
+let save = function () {
     checkAchievements(); checkRank();
     safeSet(STORE_KEY, JSON.stringify(S));
     renderTop();
-}
+};
 function ensureDaily() {
     const t = dateStr();
     if (S.daily.date !== t) S.daily = { date: t, new: 0, correct: 0, chat: 0, claimed: [] };
@@ -2586,9 +2586,12 @@ function renderMe() {
         <div class="flex-1"><div class="font-black">${isStandalone() ? '已安裝成 App ✓' : '安裝成 App'}</div><div class="text-xs" style="color:var(--muted)">加到主畫面後可以全螢幕、離線開啟（盤點、接單、陳列配對、五十音、叫賣不需要網路）</div></div>
         ${isStandalone() ? '' : '<button class="btn sm" onclick="installApp()">安裝</button>'}</div>
     <div class="card p-4 mt-4"><h3 class="font-black text-lg mb-3">💾 資料</h3>
-        <div class="grid grid-cols-3 gap-2"><button class="btn white sm" onclick="exportData()">匯出</button><button class="btn white sm" onclick="$('import-file').click()">匯入</button><button class="btn red sm" onclick="resetData()">重置</button></div>
+        <div class="grid grid-cols-2 gap-2"><button class="btn white sm" onclick="exportData()">💾 匯出存檔</button><button class="btn white sm" onclick="$('import-file').click()">📂 匯入存檔</button></div>
         <input id="import-file" type="file" accept="application/json,.json" class="hidden" onchange="importData(this)">
         <p class="text-xs mt-2" style="color:var(--muted)">存檔只在這台裝置的瀏覽器裡，換裝置請先匯出。</p></div>
+    <div id="me-restart" class="card p-4 mt-4 flex items-center gap-3"><div class="text-3xl">🔄</div>
+        <div class="flex-1"><div class="font-black">重新開始</div><div class="text-xs" style="color:var(--muted)">從第一台屋台重來。可以選擇保留學過的單字</div></div>
+        <button class="btn red sm" onclick="resetData()">重新開始</button></div>
     <p class="text-center text-xs mt-4" style="color:var(--muted)">商店街物語 LinguaMachi・圖示：Microsoft Fluent Emoji（MIT）</p>`;
 }
 // ---------- 安裝成 App（PWA） ----------
@@ -2645,9 +2648,29 @@ function importData(input) {
     r.readAsText(f); input.value = '';
 }
 function resetData() {
-    if (!confirm('確定要重置所有進度嗎？店鋪、單字和日圓都會消失，無法復原。')) return;
-    if (!confirm('再確認一次：真的要全部清空？（API Key 會保留）')) return;
-    try { localStorage.removeItem(STORE_KEY); } catch {}
+    const n = dexCount();
+    showModal(`<h3 class="text-xl font-black">🔄 重新開始</h3>
+        <p class="text-sm mt-2" style="color:var(--muted)">會回到一開始取店名的畫面。API Key、模型和音效等設定都會保留。這個動作無法復原，建議先匯出存檔。</p>
+        <button class="btn white w-full mt-3" onclick="exportData()">💾 先匯出目前的存檔</button>
+        ${n ? `<button class="card p-3 w-full text-left mt-3" style="border-color:var(--orange)" onclick="confirmReset('shop')"><div class="font-black" style="color:var(--orange-d)">只重來經營</div><div class="text-xs mt-0.5" style="color:var(--muted)">保留商品帳的 ${n} 個單字和複習進度。店鋪、日圓、街區進度、成就重來</div></button>` : ''}
+        <button class="card p-3 w-full text-left mt-2" style="border-color:var(--red)" onclick="confirmReset('all')"><div class="font-black" style="color:var(--red-d)">全部重新開始</div><div class="text-xs mt-0.5" style="color:var(--muted)">店鋪、單字、日圓、進度全部清空，新手教學也會再跑一次</div></button>
+        <button class="btn white w-full mt-3" onclick="closeModal()">取消</button>`);
+}
+function confirmReset(kind) {
+    showModal(`<div class="text-center"><div class="text-6xl">⚠️</div>
+        <h3 class="text-xl font-black mt-2">${kind === 'all' ? '確定要全部清空嗎？' : '確定要重來經營嗎？'}</h3>
+        <p class="text-sm mt-2" style="color:var(--muted)">${kind === 'all' ? `${S.shops.length} 間店、${dexCount()} 個單字、💴 ${S.coins} 都會消失。` : `${S.shops.length} 間店和 💴 ${S.coins} 會消失，${dexCount()} 個單字會保留。`}無法復原。</p>
+        <div class="grid grid-cols-2 gap-2 mt-4"><button class="btn white" onclick="closeModal()">取消</button><button class="btn red" onclick="doReset('${kind}')">確定重來</button></div></div>`);
+}
+function doReset(kind) {
+    try {
+        if (kind === 'shop') {
+            const keep = { level: S.level, sound: S.sound, rate: S.rate, fluent: S.fluent, dex: S.dex, legacy: S.legacy, grammarSeen: S.grammarSeen, installHide: S.installHide, tutorial: S.tutorial };
+            localStorage.setItem(STORE_KEY, JSON.stringify({ ...defaultState(), ...keep }));
+        } else localStorage.removeItem(STORE_KEY);
+    } catch {}
+    // 蓋掉記憶體裡的存檔函式，避免重新載入前又被寫回去
+    save = () => {};
     location.reload();
 }
 function openKeyModal() {
@@ -2761,7 +2784,7 @@ function finishWelcome() {
     S.level = $('w-level')?.value || 'N5';
     const shop = newShop('yatai', name.slice(0, 12));
     S.shops.push(shop); S.active = shop.id; S.lastCollect = Date.now();
-    save(); closeModal(); render(); burst(); startTour();
+    save(); closeModal(); render(); burst(); if (!S.tutorial) startTour();
     if (S.migrated) { delete S.migrated; save(); toast('已把舊版 LinguaMax 的經驗值換成日圓，學過的單字不會重複出現。', 'gold', 5000); }
     checkLogin();
 }
