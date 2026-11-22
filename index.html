@@ -1556,6 +1556,7 @@ function renderHome() {
         <button id="home-stock" class="btn w-full mt-4 text-lg relative" style="--c:${st.c};--cd:${st.cd}" onclick="goStock()">📦 去進貨（學新單字）</button>
     </div>
 
+    ${installBannerHTML()}
     <div id="home-open" class="card p-4 mt-4">
         <div class="flex items-center justify-between mb-3"><h3 class="font-black text-lg">🛎️ 今日營業</h3><span class="text-xs" style="color:var(--muted)">不需要網路</span></div>
         <div class="grid grid-cols-2 gap-2">
@@ -1935,6 +1936,7 @@ function nextChallenge() {
 // ---------- 進貨關卡 ----------
 async function startStage(id, i) {
     if (!apiKey) return openKeyModal();
+    if (!needNet()) return;
     const street = STREETS.find(s => s.id === id);
     const p = G.play = { mode: 'stage', loading: true };
     openPlay(); renderLoading('正在向批發商進貨…');
@@ -2048,6 +2050,7 @@ function startKana(script) {
 }
 async function startGrammar(i) {
     if (!apiKey) return openKeyModal();
+    if (!needNet()) return;
     const topic = GRAMMAR_TOPICS[i];
     const p = G.play = { mode: 'grammar', loading: true };
     openPlay(); renderLoading('師傅正在準備講義…');
@@ -2515,6 +2518,7 @@ function chatMic() {
 async function sendChat() {
     const c = G.chat, el = $('chat-in'); if (!c || c.busy || !el) return;
     const text = el.value.trim(); if (!text) return;
+    if (!needNet()) return;
     // 有假名或純英數（羅馬字）當作日文；只有漢字當作中文提問
     const isJa = hasKana(text) || !hasCJK(text);
     const me = { role: 'me', text };
@@ -2549,7 +2553,7 @@ async function sendChat() {
 // 我的（統計、成就、設定）
 // ============================================================
 let installEvt = null;
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (G.tab === 'me') renderMe(); });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (G.tab === 'me' || G.tab === 'home') render(); });
 function renderMe() {
     const acc = S.totals.answered ? Math.round(S.totals.correct / S.totals.answered * 100) : 0;
     const stat = (v, l) => `<div class="card p-3 text-center"><div class="text-2xl font-black">${v}</div><div class="text-xs" style="color:var(--muted)">${l}</div></div>`;
@@ -2579,18 +2583,50 @@ function renderMe() {
             <select class="field mt-1" onchange="model=this.value; safeSet(MODEL_STORE, model); G.prefetch={}">${MODELS.map(([id, l]) => `<option value="${id}" ${model === id ? 'selected' : ''}>${l}</option>`).join('')}${known ? '' : `<option value="${esc(model)}" selected>${esc(model)}</option>`}</select></label>
         <button class="btn w-full mt-3" onclick="openKeyModal()">${apiKey ? '更換 API Key' : '設定 API Key'}</button></div>
     <div class="card p-4 mt-4 flex items-center gap-3"><img src="icons/icon-192.png" alt="" class="w-14 h-14 rounded-2xl" onerror="this.remove()">
-        <div class="flex-1"><div class="font-black">安裝到手機</div><div class="text-xs" style="color:var(--muted)">加到主畫面後可以全螢幕、離線開啟（盤點、五十音、叫賣不需要網路）</div></div>
-        <button class="btn sm" onclick="installApp()">安裝</button></div>
+        <div class="flex-1"><div class="font-black">${isStandalone() ? '已安裝成 App ✓' : '安裝成 App'}</div><div class="text-xs" style="color:var(--muted)">加到主畫面後可以全螢幕、離線開啟（盤點、接單、陳列配對、五十音、叫賣不需要網路）</div></div>
+        ${isStandalone() ? '' : '<button class="btn sm" onclick="installApp()">安裝</button>'}</div>
     <div class="card p-4 mt-4"><h3 class="font-black text-lg mb-3">💾 資料</h3>
         <div class="grid grid-cols-3 gap-2"><button class="btn white sm" onclick="exportData()">匯出</button><button class="btn white sm" onclick="$('import-file').click()">匯入</button><button class="btn red sm" onclick="resetData()">重置</button></div>
         <input id="import-file" type="file" accept="application/json,.json" class="hidden" onchange="importData(this)">
         <p class="text-xs mt-2" style="color:var(--muted)">存檔只在這台裝置的瀏覽器裡，換裝置請先匯出。</p></div>
     <p class="text-center text-xs mt-4" style="color:var(--muted)">商店街物語 LinguaMachi・圖示：Microsoft Fluent Emoji（MIT）</p>`;
 }
-async function installApp() {
-    if (installEvt) { installEvt.prompt(); installEvt = null; return; }
-    toast('請用瀏覽器選單的「加入主畫面」或「安裝應用程式」。', 'info', 4000);
+// ---------- 安裝成 App（PWA） ----------
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function canInstall() { return !isStandalone() && (!!installEvt || isIOS()); }
+function installBannerHTML() {
+    if (S.installHide || !canInstall() || !S.shops.length) return '';
+    return `<div class="card p-3 mt-4 flex items-center gap-3" style="background:var(--indigo-t);border-color:#c5d9ec">
+        <img src="icons/icon-192.png" alt="" class="rounded-2xl" style="width:44px;height:44px" onerror="this.remove()">
+        <div class="flex-1 min-w-0"><div class="font-black">安裝成 App</div><div class="text-xs" style="color:var(--muted)">加到主畫面，全螢幕開啟，沒有網路也能盤點和接單</div></div>
+        <div class="flex flex-col gap-1.5"><button class="btn sm indigo" onclick="installApp()">安裝</button><button class="border-0 bg-transparent text-xs" style="color:var(--muted)" onclick="S.installHide = true; save(); renderHome()">不用了</button></div></div>`;
 }
+async function installApp() {
+    if (isStandalone()) return toast('已經安裝好了 ✓', 'good');
+    if (installEvt) {
+        const evt = installEvt; installEvt = null;
+        evt.prompt();
+        try { const r = await evt.userChoice; if (r?.outcome !== 'accepted') installEvt = evt; } catch {}
+        return render();
+    }
+    const steps = isIOS()
+        ? ['用 <b>Safari</b> 開啟這個頁面（其他瀏覽器不支援）', '點下方工具列的 <b>分享</b> 按鈕（方框加向上箭頭）', '往下找到 <b>加入主畫面</b>', '點右上角的 <b>加入</b>']
+        : ['點瀏覽器右上角的 <b>⋮</b> 或 <b>⋯</b> 選單', '選 <b>安裝應用程式</b> 或 <b>加到主畫面</b>', '在跳出的視窗按 <b>安裝</b>'];
+    showModal(`<h3 class="text-xl font-black">📲 安裝到${isIOS() ? ' iPhone／iPad' : '這台裝置'}</h3>
+        <ol class="mt-3 space-y-2">${steps.map((t, i) => `<li class="flex gap-2"><span class="pill" style="background:var(--pri-t);color:var(--pri-d)">${i + 1}</span><span class="flex-1">${t}</span></li>`).join('')}</ol>
+        <p class="text-xs mt-3" style="color:var(--muted)">安裝後會出現在主畫面，全螢幕開啟。存檔和 API Key 都留在這台裝置上。</p>
+        <button class="btn w-full mt-4" onclick="closeModal()">知道了</button>`);
+}
+window.addEventListener('appinstalled', () => { installEvt = null; toast('📲 安裝完成！可以從主畫面開啟了', 'good', 4000); render(); });
+// 離線提示：需要 Claude 的功能先擋下來，並告訴玩家離線能玩什麼
+function needNet() {
+    if (navigator.onLine !== false) return true;
+    toast('目前沒有網路。這個功能需要連線；盤點、接單、陳列配對、五十音和叫賣離線也能玩。', 'bad', 4500);
+    return false;
+}
+window.addEventListener('offline', () => toast('📴 已離線：盤點、接單、陳列配對、五十音、叫賣仍可使用', 'info', 4000));
+window.addEventListener('online', () => toast('📶 網路恢復了', 'good', 2000));
 function exportData() {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(S)], { type: 'application/json' }));
@@ -2751,7 +2787,23 @@ ensureDaily();
 fluentify(document.body);
 render();
 if (!S.shops.length) openWelcome(); else checkLogin();
-if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    // 已經有舊版在控制頁面時，新版接手就提示重新整理
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) toast('🔄 已下載新版本，重新整理後生效', 'gold', 5000); });
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+// 請瀏覽器不要自動清掉存檔
+if (S.shops.length) navigator.storage?.persist?.().catch(() => {});
+// App 圖示長按的捷徑：./?go=review、order、kana
+{
+    const go = new URLSearchParams(location.search).get('go');
+    if (go) {
+        try { history.replaceState(null, '', location.pathname); } catch {}
+        const run = { review: () => startReview(dueWords().length ? 'due' : undefined), order: () => startOrder(), kana: () => openKana() }[go];
+        if (run && S.shops.length) setTimeout(() => { if (!G.play && !G.tour) { if (G.modalOpen) closeModal(); run(); } }, 400);
+    }
+}
 </script>
 </body>
 </html>

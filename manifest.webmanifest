@@ -1,17 +1,26 @@
 {
+  "id": "./",
   "name": "商店街物語 LinguaMachi",
   "short_name": "商店街物語",
   "description": "經營日式商店街學日文：進貨學單字、盤點複習、接受評論家評鑑、AI 情境會話",
   "lang": "zh-TW",
+  "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#fbf3e4",
-  "theme_color": "#d9482b",
+  "theme_color": "#fbf3e4",
+  "categories": ["education", "games"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "盤點複習", "short_name": "盤點", "description": "複習到期的單字", "url": "./?go=review", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "接單", "short_name": "接單", "description": "聽客人點什麼，從貨架挑出來", "url": "./?go=order", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "五十音道場", "short_name": "五十音", "description": "平假名、片假名快問快答", "url": "./?go=kana", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
   ]
 }
